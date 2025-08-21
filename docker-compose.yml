@@ -1,4 +1,4 @@
-version: '3.8'
+
 
 services:
   postgres:
@@ -82,8 +82,8 @@ services:
         condition: service_healthy
       ad-engine:
         condition: service_healthy
-      raffle-service:
-        condition: service_healthy
+      # raffle-service:
+      #   condition: service_healthy
       jaeger:
         condition: service_started
       vault:
@@ -164,23 +164,20 @@ services:
     environment:
       - VAULT_TOKEN=myroottoken
 
-  raffle-service:
-    build:
-      context: .
-      dockerfile: services/raffle-service/Dockerfile
-    container_name: raffle-service
-    ports:
-      - '8085:8080'
-    depends_on:
-      - postgres
-      - jaeger
-      - vault
-    environment:
-      - VAULT_TOKEN=myroottoken
+  # raffle-service:
+  #   build:
+  #     context: .
+  #     dockerfile: services/raffle-service/Dockerfile
+  #   container_name: raffle-service
+  #   ports:
+  #     - '8085:8080'
+  #   depends_on:
+  #     - postgres
+  #     - jaeger
+  #     - vault
+  #   environment:
+  #     - VAULT_TOKEN=myroottoken
 
-volumes:
-  postgres_data:
-  redis_data:
   coupon-service:
     build:
       context: .
@@ -204,13 +201,6 @@ volumes:
       retries: 3
       start_period: 40s
 
-  owner-dashboard:
-    build:
-      context: .
-      dockerfile: apps/owner-dashboard/Dockerfile
-    container_name: owner-dashboard
-    ports:
-      - '3002:3000'
-    environment:
-      - NODE_ENV=production
-      - NEXT_PUBLIC_API_URL=http://localhost:8080
+volumes:
+  postgres_data:
+  redis_data:

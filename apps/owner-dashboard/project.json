@@ -1,0 +1,49 @@
+{
+  "name": "owner-dashboard",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/owner-dashboard/src",
+  "projectType": "application",
+  "targets": {
+    "build": {
+      "executor": "@nx/next:build",
+      "outputs": ["{options.outputPath}"],
+      "defaultConfiguration": "production",
+      "options": {
+        "outputPath": "dist/apps/owner-dashboard"
+      },
+      "configurations": {
+        "development": {
+          "outputPath": "apps/owner-dashboard"
+        },
+        "production": {}
+      }
+    },
+    "serve": {
+      "executor": "@nx/next:server",
+      "defaultConfiguration": "development",
+      "options": {
+        "buildTarget": "owner-dashboard:build",
+        "dev": true,
+        "port": 3010
+      },
+      "configurations": {
+        "development": {
+          "buildTarget": "owner-dashboard:build:development",
+          "dev": true
+        },
+        "production": {
+          "buildTarget": "owner-dashboard:build:production",
+          "dev": false
+        }
+      }
+    },
+    "lint": {
+      "executor": "@nx/eslint:lint",
+      "outputs": ["{options.outputFile}"],
+      "options": {
+        "lintFilePatterns": ["apps/owner-dashboard/**/*.{ts,tsx,js,jsx}"]
+      }
+    }
+  },
+  "tags": []
+}

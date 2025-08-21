@@ -1,0 +1,24 @@
+CREATE TABLE raffles (
+    id UUID PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    start_date TIMESTAMP NOT NULL,
+    end_date TIMESTAMP NOT NULL,
+    prize VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE raffle_participants (
+    id UUID PRIMARY KEY,
+    raffle_id UUID NOT NULL REFERENCES raffles(id),
+    user_id UUID NOT NULL,
+    tickets INTEGER NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE winners (
+    id UUID PRIMARY KEY,
+    raffle_id UUID NOT NULL REFERENCES raffles(id),
+    user_id UUID NOT NULL,
+    prize VARCHAR(255) NOT NULL,
+    won_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);

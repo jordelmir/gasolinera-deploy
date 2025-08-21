@@ -120,10 +120,6 @@ class QRCouponService(
     }
 
     fun getStationStats(stationId: UUID, days: Int = 30): Map<String, Any> {
-        val startDate = LocalDateTime.now().minusDays(days.toLong())
-        val endDate = LocalDateTime.now()
-
-        val stats = couponRepository.getStationStats(startDate, endDate)
         val coupons = couponRepository.findByStationId(stationId)
 
         return mapOf(
@@ -135,9 +131,6 @@ class QRCouponService(
     }
 
     fun getEmployeeStats(employeeId: UUID, days: Int = 30): Map<String, Any> {
-        val startDate = LocalDateTime.now().minusDays(days.toLong())
-        val endDate = LocalDateTime.now()
-
         val coupons = couponRepository.findByEmployeeId(employeeId)
 
         return mapOf(

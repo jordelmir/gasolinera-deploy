@@ -1,103 +1,138 @@
+// Ruta: apps/admin/src/app/(auth)/login/page.tsx
 "use client";
 
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from "@/components/ui/button";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
-import { toast } from 'react-toastify';
-import { Spinner } from "@/components/ui/spinner";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuthStore } from '@/store/authStore';
-import { loginAdmin } from '@/lib/apiClient';
+import apiClient from '@/lib/api/client';
 
 
-const formSchema = z.object({
-  email: z.string().email({ message: "Invalid email address." }),
-  password: z.string().min(6, { message: "Password must be at least 6 characters." }),
-});
-
-export default function AdminLoginPage() {
+export default function AuthenticationPage() {
   const router = useRouter();
-  const login = useAuthStore((state) => state.login);
+  const loginAction = useAuthStore((state) => state.login);
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors, isSubmitting },
-  } = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      email: "",
-      password: "",
-    },
-  });
+  const [isLoading, setIsLoading] = useState(false);
+  
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  
+  const [registerName, setRegisterName] = useState('');
+  const [registerEmail, setRegisterEmail] = useState('');
+  const [registerPassword, setRegisterPassword] = useState('');
 
-  const onSubmit = async (data: z.infer<typeof formSchema>) => {
+  const handleLogin = async () => {
+    setIsLoading(true);
     try {
-      const { token, refreshToken, user } = await loginAdmin(data.email, data.password);
-      login(token, user); // Assuming your store handles the user object
-      toast.success("Login successful!");
+      // Llamada real a la API a través de nuestro cliente centralizado
+      const response = await apiClient.post('/auth/login', {
+        email: loginEmail,
+        password: loginPassword,
+      });
+
+      // El backend debería devolver algo como: { user: {...}, accessToken: "..." }
+      const { user, accessToken } = response.data;
+
+      // Guardar sesión en el store de Zustand
+      loginAction(user, accessToken);
+
+      // Redirigir al dashboard
       router.push('/dashboard');
-    } catch (err: any) {
-      toast.error(err.message || 'An unknown error occurred.');
+
+    } catch (error) {
+      console.error("Error en el inicio de sesión:", error);
+      alert('Credenciales incorrectas o error en el servidor.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleRegister = async () => {
+    setIsLoading(true);
+    try {
+        // Llamada real a la API para registrar
+        await apiClient.post('/auth/register', {
+            name: registerName,
+            email: registerEmail,
+            password: registerPassword
+        });
+
+        alert('¡Registro exitoso! Por favor, inicia sesión.');
+        // Opcional: Iniciar sesión automáticamente después del registro
+        
+    } catch (error) {
+        console.error("Error en el registro:", error);
+        alert('No se pudo completar el registro. Inténtalo de nuevo.');
+    } finally {
+        setIsLoading(false);
     }
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-100 dark:bg-gray-900">
-      <form onSubmit={handleSubmit(onSubmit)} className="w-full max-w-sm">
-        <Card className="w-full max-w-sm">
-          <CardHeader>
-            <CardTitle className="text-2xl">Admin Login</CardTitle>
-            <CardDescription>
-              Ingresa tus credenciales para acceder al panel de control.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="grid gap-4">
-            <div className="grid gap-2">
-              <Label htmlFor="email">Email</Label>
-              <Input 
-                id="email" 
-                type="email" 
-                placeholder="admin@example.com" 
-                required 
-                {...register("email")}
-                disabled={isSubmitting}
-              />
-              {errors.email && (
-                <p className="text-red-500 text-sm">{errors.email.message}</p>
-              )}
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="password">Password</Label>
-              <Input 
-                id="password" 
-                type="password" 
-                required
-                {...register("password")}
-                disabled={isSubmitting}
-              />
-              {errors.password && (
-                <p className="text-red-500 text-sm">{errors.password.message}</p>
-              )}
-            </div>
-          </CardContent>
-          <CardFooter>
-            <Button className="w-full" type="submit" disabled={isSubmitting}>
-              {isSubmitting ? (
-                <div className="flex items-center gap-2">
-                  <Spinner /> Iniciando sesión...
+    <div className="flex items-center justify-center min-h-screen bg-background">
+      <Tabs defaultValue="login" className="w-[400px]">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="login">Iniciar Sesión</TabsTrigger>
+          <TabsTrigger value="register">Registrarse</TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="login">
+          <Card>
+            <CardHeader>
+              <CardTitle>Bienvenido de Nuevo</CardTitle>
+              <CardDescription>Ingresa tus credenciales para acceder a tu cuenta.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="login-email">Correo Electrónico</Label>
+                <Input id="login-email" type="email" placeholder="tu@correo.com" value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)} disabled={isLoading} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="login-password">Contraseña</Label>
+                <Input id="login-password" type="password" value={loginPassword} onChange={(e) => setLoginPassword(e.target.value)} disabled={isLoading} />
+              </div>
+            </CardContent>
+            <CardFooter className="flex flex-col gap-4">
+              <Button className="w-full" onClick={handleLogin} disabled={isLoading}>
+                {isLoading ? 'Ingresando...' : 'Iniciar Sesión'}
+              </Button>
+            </CardFooter>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="register">
+          <Card>
+            <CardHeader>
+              <CardTitle>Crear una Cuenta</CardTitle>
+              <CardDescription>Es rápido y fácil. Empieza a acumular puntos hoy.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+                <div className="space-y-2">
+                    <Label htmlFor="register-name">Nombre Completo</Label>
+                    <Input id="register-name" placeholder="Tu Nombre" value={registerName} onChange={(e) => setRegisterName(e.target.value)} disabled={isLoading} />
                 </div>
-              ) : (
-                'Iniciar Sesión'
-              )}
-            </Button>
-          </CardFooter>
-        </Card>
-      </form>
-      </div>
+                <div className="space-y-2">
+                    <Label htmlFor="register-email">Correo Electrónico</Label>
+                    <Input id="register-email" type="email" placeholder="tu@correo.com" value={registerEmail} onChange={(e) => setRegisterEmail(e.target.value)} disabled={isLoading} />
+                </div>
+                <div className="space-y-2">
+                    <Label htmlFor="register-password">Contraseña</Label>
+                    <Input id="register-password" type="password" value={registerPassword} onChange={(e) => setRegisterPassword(e.target.value)} disabled={isLoading} />
+                </div>
+            </CardContent>
+            <CardFooter>
+              <Button className="w-full" onClick={handleRegister} disabled={isLoading}>
+                {isLoading ? 'Creando...' : 'Crear Cuenta'}
+              </Button>
+            </CardFooter>
+          </Card>
+        </TabsContent>
+
+      </Tabs>
+    </div>
   );
 }

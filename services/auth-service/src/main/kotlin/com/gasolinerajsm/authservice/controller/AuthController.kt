@@ -47,8 +47,8 @@ class AuthController(
         logger.info("OTP verified successfully for phone {}", request.phone)
 
         val user = userService.findOrCreateUser(request.phone)
-        val accessToken = jwtService.generateAccessToken(user.id)
-        val refreshToken = jwtService.generateRefreshToken(user.id)
+        val accessToken = jwtService.generateAccessToken(user.id.toString())
+        val refreshToken = jwtService.generateRefreshToken(user.id.toString())
 
         logger.info("Tokens generated for user ID {}", user.id)
         return ResponseEntity.ok(TokenResponse(accessToken, refreshToken))

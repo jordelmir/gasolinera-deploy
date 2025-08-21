@@ -2,8 +2,13 @@
   "targetDefaults": {
     "build": {
       "cache": true,
-      "outputs": ["{projectRoot}/dist", "{projectRoot}/build"],
-      "dependsOn": ["^build"]
+      "outputs": [
+        "{projectRoot}/dist",
+        "{projectRoot}/build"
+      ],
+      "dependsOn": [
+        "^build"
+      ]
     },
     "lint": {
       "cache": true,
@@ -15,7 +20,11 @@
     },
     "test": {
       "cache": true,
-      "inputs": ["default", "^production", "{workspaceRoot}/jest.preset.js"]
+      "inputs": [
+        "default",
+        "^production",
+        "{workspaceRoot}/jest.preset.js"
+      ]
     },
     "serve": {
       "cache": false
@@ -25,7 +34,10 @@
     "defaultBase": "main"
   },
   "namedInputs": {
-    "default": ["{projectRoot}/**/*", "sharedGlobals"],
+    "default": [
+      "{projectRoot}/**/*",
+      "sharedGlobals"
+    ],
     "production": [
       "default",
       "!{projectRoot}/**/?(*.)+(spec|test).[jt]s?(x)?(.snap)",
@@ -50,5 +62,6 @@
         "bundler": "vite"
       }
     }
-  }
+  },
+  "$schema": "./node_modules/nx/schemas/nx-schema.json"
 }

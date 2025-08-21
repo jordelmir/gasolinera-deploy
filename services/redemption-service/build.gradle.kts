@@ -1,17 +1,36 @@
+import org.springframework.boot.gradle.tasks.bundling.BootJar
 
 plugins {
-    id("org.springframework.boot") version "3.2.3"
-    id("io.spring.dependency-management") version "1.1.4"
-    kotlin("jvm") version "1.9.22"
-    kotlin("plugin.spring") version "1.9.22"
-    kotlin("plugin.jpa") version "1.9.22"
+    id("org.springframework.boot")
+    id("io.spring.dependency-management")
+    kotlin("jvm")
+    kotlin("plugin.spring")
+    id("io.gitlab.arturbosch.detekt")
 }
 
-group = "com.gasolinerajsm"
+detekt {
+    toolVersion = "1.23.7"
+    buildUponDefaultConfig = true
+    allRules = false
+    baseline = file("detekt-baseline.xml")
+}
+
+tasks.withType<io.gitlab.arturbosch.detekt.Detekt>().configureEach {
+    reports {
+        xml.required.set(true)
+        html.required.set(true)
+        txt.required.set(false)
+        sarif.required.set(false)
+    }
+}
+
+group = "com.gasolinerajsm.redemptionservice"
 version = "0.0.1-SNAPSHOT"
 
 java {
-    sourceCompatibility = JavaVersion.VERSION_17
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(17)
+    }
 }
 
 repositories {
@@ -19,45 +38,57 @@ repositories {
 }
 
 dependencies {
+    detektPlugins("io.gitlab.arturbosch.detekt:detekt-formatting:1.23.7") // Detekt formatting rules
+    // --- Spring Boot Starters ---
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
     implementation("org.springframework.boot:spring-boot-starter-data-redis")
-    implementation("org.springframework.boot:spring-boot-starter-amqp") // RabbitMQ
-    implementation("org.springframework.boot:spring-boot-starter-validation")
+    implementation("org.springframework.boot:spring-boot-starter-security")
     implementation("org.springframework.cloud:spring-cloud-starter-vault-config:4.1.3")
-    implementation(project(":packages:temp-sdk")) // NEW: Temporary SDK for API clients
 
-    // --- Observability (OpenTelemetry Tracing) ---
+    // --- Observabilidad (Actuator + Prometheus) ---
+    implementation("org.springframework.boot:spring-boot-starter-actuator") // NUEVO
+    implementation("io.micrometer:micrometer-registry-prometheus")   // NUEVO
+
+    // --- OpenTelemetry Tracing ---
     implementation("io.micrometer:micrometer-tracing-bridge-brave")
-    implementation("io.micrometer:micrometer-tracing-reporter-brave")
     implementation("io.opentelemetry:opentelemetry-exporter-otlp")
 
+    // --- Logging ---
+    implementation("net.logstash.logback:logstash-logback-encoder:7.4") // For structured JSON logging
+
+    // --- Kotlin y Jackson ---
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
     implementation("org.jetbrains.kotlin:kotlin-reflect")
-    implementation("org.flywaydb:flyway-core")
-    implementation("org.flywaydb:flyway-database-postgresql")
-    // For JWT parsing/verification
-    implementation("org.springframework.boot:spring-boot-starter-actuator")
-    implementation("io.micrometer:micrometer-registry-prometheus")
+
+    // --- Base de Datos ---
+    runtimeOnly("org.postgresql:postgresql")
+
+    // --- JWT ---
     implementation("io.jsonwebtoken:jjwt-api:0.11.5")
     runtimeOnly("io.jsonwebtoken:jjwt-impl:0.11.5")
     runtimeOnly("io.jsonwebtoken:jjwt-jackson:0.11.5")
-    
-    runtimeOnly("org.postgresql:postgresql")
-    testImplementation("org.springframework.boot:spring-boot-starter-test")
-    testImplementation("org.springframework.amqp:spring-rabbit-test")
-    implementation("net.logstash.logback:logstash-logback-encoder:7.4") // For structured JSON logging
+
+    // --- Tests ---
+    testImplementation("org.springframework.boot:spring-boot-starter-test") {
+        exclude(group = "org.junit.vintage", module = "junit-vintage-engine")
+    }
+    testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
+    testImplementation("org.springframework.security:spring-security-test")
 }
 
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
     kotlinOptions {
-        freeCompilerArgs += "-Xjsr305=strict"
+        freeCompilerArgs = listOf("-Xjsr305=strict")
         jvmTarget = "17"
     }
 }
 
-tasks.withType<org.springframework.boot.gradle.tasks.bundling.BootJar> {
-    archiveFileName.set("app.jar")
-    mainClassName = "com.gasolinerajsm.redemptionservice.RedemptionServiceApplicationKt"
+tasks.withType<Test> {
+    useJUnitPlatform()
+}
+
+tasks.getByName<org.springframework.boot.gradle.tasks.bundling.BootJar>("bootJar") {
+    archiveFileName.set("redemption-service.jar")
 }

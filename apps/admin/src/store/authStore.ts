@@ -1,35 +1,36 @@
-"use client"; // Muy importante
-
+// Ruta: apps/admin/src/store/authStore.ts
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 
-interface AuthState {
-  token: string | null;
-  user: any | null; // Puedes usar un tipo más específico para el usuario
-  login: (token: string, user: any) => void;
-  logout: () => void;
+interface User {
+  id: string;
+  name: string;
+  email: string;
 }
 
-// Este es un truco para evitar errores de SSR con persist
-// Crea un almacenamiento "dummy" en el servidor que no hace nada
-const dummyStorage = createJSONStorage(() => ({
-  getItem: () => null,
-  setItem: () => {},
-  removeItem: () => {},
-}));
+interface AuthState {
+  user: User | null;
+  accessToken: string | null;
+  isAuthenticated: boolean;
+  login: (userData: User, token: string) => void;
+  logout: () => void;
+}
 
 export const useAuthStore = create<AuthState>()(
   persist(
     (set) => ({
-      token: null,
       user: null,
-      login: (token, user) => set({ token, user }),
-      logout: () => set({ token: null, user: null }),
+      accessToken: null,
+      isAuthenticated: false,
+      login: (userData, token) => set({ user: userData, accessToken: token, isAuthenticated: true }),
+      logout: () => {
+        // También podrías añadir una llamada a la API /auth/logout aquí
+        set({ user: null, accessToken: null, isAuthenticated: false });
+      },
     }),
     {
-      name: 'auth-storage', // nombre de la clave en localStorage
-      // Usa el localStorage real en el cliente, y el dummy en el servidor
-      storage: typeof window !== 'undefined' ? createJSONStorage(() => localStorage) : dummyStorage,
+      name: 'auth-storage', // Nombre de la clave en localStorage
+      storage: createJSONStorage(() => localStorage),
     }
   )
 );

@@ -1,34 +1,36 @@
+import org.springframework.boot.gradle.tasks.bundling.BootJar
+
 plugins {
-    id("org.springframework.boot") version "3.2.3"
-    id("io.spring.dependency-management") version "1.1.4"
-    kotlin("jvm") version "1.9.22"
-    kotlin("plugin.spring") version "1.9.22"
-    kotlin("plugin.jpa") version "1.9.22"
-    id("io.gitlab.arturbosch.detekt") version "1.23.6" // Detekt plugin
+    id("org.springframework.boot")
+    id("io.spring.dependency-management")
+    kotlin("jvm")
+    kotlin("plugin.spring")
+    id("io.gitlab.arturbosch.detekt")
 }
 
 detekt {
-    toolVersion = "1.23.6"
+    toolVersion = "1.23.7"
     buildUponDefaultConfig = true
-    allRules = false // Set to true to enable all rules, or false to use default config
-    // config = files("${project.rootDir}/detekt-config.yml") // Optional: path to custom Detekt config
-    baseline = file("detekt-baseline.xml") // Optional: path to Detekt baseline file
+    allRules = false
+    baseline = file("detekt-baseline.xml")
+}
+
+tasks.withType<io.gitlab.arturbosch.detekt.Detekt>().configureEach {
     reports {
-        xml { enabled = true }
-        html { enabled = true }
-        txt { enabled = false }
-        sarif { enabled = false }
+        xml.required.set(true)
+        html.required.set(true)
+        txt.required.set(false)
+        sarif.required.set(false)
     }
 }
 
-dependencies {
-    detektPlugins("io.gitlab.arturbosch.detekt:detekt-formatting:1.23.6") // Detekt formatting rules
-
-group = "com.gasolinerajsm"
+group = "com.gasolinerajsm.raffleservice"
 version = "0.0.1-SNAPSHOT"
 
 java {
-    sourceCompatibility = JavaVersion.VERSION_17
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(17)
+    }
 }
 
 repositories {
@@ -36,43 +38,57 @@ repositories {
 }
 
 dependencies {
+    detektPlugins("io.gitlab.arturbosch.detekt:detekt-formatting:1.23.7") // Detekt formatting rules
+    // --- Spring Boot Starters ---
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-validation")
-    implementation("org.springframework.cloud:spring-cloud-starter-vault-config:4.1.3")
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
     implementation("org.springframework.boot:spring-boot-starter-data-redis")
-    implementation("org.springframework.boot:spring-boot-starter-actuator")
-    implementation("io.micrometer:micrometer-registry-prometheus")
+    implementation("org.springframework.boot:spring-boot-starter-security")
+    implementation("org.springframework.cloud:spring-cloud-starter-vault-config:4.1.3")
+
+    // --- Observabilidad (Actuator + Prometheus) ---
+    implementation("org.springframework.boot:spring-boot-starter-actuator") // NUEVO
+    implementation("io.micrometer:micrometer-registry-prometheus")   // NUEVO
+
+    // --- OpenTelemetry Tracing ---
     implementation("io.micrometer:micrometer-tracing-bridge-brave")
-    implementation("io.micrometer:micrometer-tracing-reporter-brave")
     implementation("io.opentelemetry:opentelemetry-exporter-otlp")
+
+    // --- Logging ---
+    implementation("net.logstash.logback:logstash-logback-encoder:7.4") // For structured JSON logging
+
+    // --- Kotlin y Jackson ---
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
     implementation("org.jetbrains.kotlin:kotlin-reflect")
-    implementation("org.flywaydb:flyway-core")
-    implementation("org.flywaydb:flyway-database-postgresql")
-    implementation("net.logstash.logback:logstash-logback-encoder:7.4")
 
-    // Database
+    // --- Base de Datos ---
     runtimeOnly("org.postgresql:postgresql")
 
-    // HTTP Client for external API (e.g., Bitcoin block hash)
-    implementation("org.springframework.boot:spring-boot-starter-webflux") // For WebClient
+    // --- JWT ---
+    implementation("io.jsonwebtoken:jjwt-api:0.11.5")
+    runtimeOnly("io.jsonwebtoken:jjwt-impl:0.11.5")
+    runtimeOnly("io.jsonwebtoken:jjwt-jackson:0.11.5")
 
-    // Merkle Tree Library (example, might need to implement custom)
-    // implementation("com.github.merkletree:merkletree:1.0.0") // Placeholder, check for actual library
-
-    // Tests
-    testImplementation("org.springframework.boot:spring-boot-starter-test")
+    // --- Tests ---
+    testImplementation("org.springframework.boot:spring-boot-starter-test") {
+        exclude(group = "org.junit.vintage", module = "junit-vintage-engine")
+    }
+    testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
+    testImplementation("org.springframework.security:spring-security-test")
 }
 
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
     kotlinOptions {
-        freeCompilerArgs += "-Xjsr305=strict"
+        freeCompilerArgs = listOf("-Xjsr305=strict")
         jvmTarget = "17"
     }
 }
 
-tasks.withType<org.springframework.boot.gradle.tasks.bundling.BootJar> {
+tasks.withType<Test> {
+    useJUnitPlatform()
+}
+
+tasks.getByName<org.springframework.boot.gradle.tasks.bundling.BootJar>("bootJar") {
     archiveFileName.set("raffle-service.jar")
-    mainClassName = "com.gasolinerajsm.raffleservice.RaffleServiceApplicationKt"
 }

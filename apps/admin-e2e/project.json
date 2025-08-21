@@ -1,0 +1,34 @@
+{
+  "name": "admin-e2e",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/admin-e2e/src",
+  "projectType": "application",
+  "targets": {
+    "e2e": {
+      "executor": "@nx/playwright:playwright",
+      "outputs": ["{workspaceRoot}/dist/apps/admin-e2e"],
+      "options": {
+        "e2eFiles": ["{projectRoot}/src/e2e/**/*.spec.ts"],
+        "devServerTarget": "admin:serve",
+        "webServerCommands": {
+          "default": "npx nx run admin:serve"
+        },
+        "webServerAddress": "http://localhost:3000"
+      },
+      "configurations": {
+        "production": {
+          "devServerTarget": "admin:serve:production"
+        }
+      }
+    },
+    "lint": {
+      "executor": "@nx/eslint:lint",
+      "outputs": ["{options.outputFile}"],
+      "options": {
+        "lintFilePatterns": ["apps/admin-e2e/**/*.{js,ts}"]
+      }
+    }
+  },
+  "tags": [],
+  "implicitDependencies": ["admin"]
+}

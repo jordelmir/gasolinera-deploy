@@ -8,11 +8,11 @@ import java.util.UUID
 @Table(name = "users")
 data class User(
     @Id
-    @GeneratedValue(strategy = GenerationType.AUTO)
-    val id: UUID = UUID.randomUUID(),
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    val id: Long = 0,
 
-    @Column(name = "phone_number", unique = true, nullable = false)
-    val phoneNumber: String,
+    @Column(name = "phone", unique = true, nullable = false)
+    val phone: String,
 
     @Column(name = "created_at", nullable = false)
     val createdAt: Instant = Instant.now(),

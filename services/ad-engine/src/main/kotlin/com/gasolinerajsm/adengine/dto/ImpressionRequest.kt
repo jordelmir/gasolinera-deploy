@@ -13,5 +13,14 @@ data class ImpressionRequest(
     val campaignId: Long,
 
     @field:NotBlank(message = "Creative ID cannot be blank")
-    val creativeId: String
+    val creativeId: String,
+
+    @field:NotBlank(message = "Station ID cannot be blank")
+    val stationId: String,
+
+    val sessionId: String? = null,
+    val sequenceId: String? = null,
+    val duration: Int = 0,
+    val completed: Boolean = false,
+    val skipped: Boolean = false
 )

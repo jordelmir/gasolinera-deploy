@@ -7,12 +7,12 @@ COPY services/coupon-service/src ./services/coupon-service/src
 
 RUN gradle :services:coupon-service:build -x test --no-daemon
 
-FROM openjdk:17-jre-slim
+FROM openjdk:17-alpine
 
 WORKDIR /app
 
 # Install curl for health checks
-RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+RUN apk --no-cache add curl
 
 COPY --from=build /app/services/coupon-service/build/libs/*.jar app.jar
 

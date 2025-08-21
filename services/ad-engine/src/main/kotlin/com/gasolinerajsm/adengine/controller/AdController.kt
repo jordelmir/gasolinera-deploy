@@ -33,13 +33,18 @@ class AdController(
         val adImpression = AdImpression(
             userId = request.userId,
             campaignId = request.campaignId,
-            creativeId = request.creativeId
+            creativeId = request.creativeId,
+            stationId = request.stationId,
+            sessionId = request.sessionId,
+            sequenceId = request.sequenceId,
+            duration = request.duration,
+            completed = request.completed,
+            skipped = request.skipped
         )
         adImpressionRepository.save(adImpression)
         return ResponseEntity.ok().build()
     }
 
-    @GetMapping("/impressions")
     @GetMapping("/impressions")
     fun getImpressions(
         @RequestParam(required = false) campaignId: Long?,

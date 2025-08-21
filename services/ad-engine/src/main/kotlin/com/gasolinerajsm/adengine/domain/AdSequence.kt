@@ -1,47 +1,46 @@
 package com.gasolinerajsm.adengine.domain
 
 import jakarta.persistence.*
-import org.springframework.data.annotation.CreatedDate
-import org.springframework.data.jpa.domain.support.AuditingEntityListener
 import java.time.LocalDateTime
-import java.util.*
 
+/**
+ * Simplified Ad Sequence entity
+ */
 @Entity
 @Table(name = "ad_sequences")
-@EntityListeners(AuditingEntityListener::class)
 data class AdSequence(
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    val id: UUID = UUID.randomUUID(),
+    val id: String = "",
 
     @Column(nullable = false)
-    val couponId: UUID,
+    val userId: String = "",
 
     @Column(nullable = false)
-    val userId: UUID,
+    val stationId: String = "",
 
     @Column(nullable = false)
-    val currentStep: Int = 1, // Paso actual en la secuencia
+    val currentStep: Int = 1,
 
     @Column(nullable = false)
-    val maxSteps: Int = 10, // Máximo 10 anuncios
+    val totalSteps: Int = 5,
 
     @Column(nullable = false)
-    val baseTickets: Int,
+    val status: String = "ACTIVE",
 
     @Column(nullable = false)
-    val currentTickets: Int,
-
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    val status: SequenceStatus = SequenceStatus.ACTIVE,
+    val createdAt: LocalDateTime = LocalDateTime.now(),
 
     @Column
-    val completedAtcalDateTime? = null,
+    val completedAt: LocalDateTime? = null,
 
-    @CreatedDate
-    @Column(nullable = false, updatable = false)
-    val createdAt: LocalDateTime = LocalTime.now()
+    @Column(nullable = false)
+    val rewardEarned: Int = 0,
+
+    @Column(nullable = false)
+    val rewardClaimed: Boolean = false,
+
+    @Column
+    val sessionId: String? = null
 )
 
 enum class SequenceStatus {

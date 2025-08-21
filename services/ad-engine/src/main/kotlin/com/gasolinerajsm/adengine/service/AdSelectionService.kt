@@ -19,8 +19,7 @@ class AdSelectionService(
 
     fun selectAd(request: AdSelectionRequest): AdCreativeResponse {
         val activeCampaigns = campaignRepository.findActiveCampaignsForStation(
-            request.stationId,
-            Date() // Use current date for selection
+            request.stationId
         )
 
         return if (activeCampaigns.isNotEmpty()) {
@@ -29,7 +28,7 @@ class AdSelectionService(
             AdCreativeResponse(
                 adUrl = selectedCampaign.adUrl,
                 campaignId = selectedCampaign.id,
-                creativeId = "creative-${selectedCampaign.id}" // Placeholder creative ID
+                creativeId = "creative-${selectedCampaign.id}"
             )
         } else {
             logger.warn("No active campaigns found for station {}. Serving fallback ad.", request.stationId)

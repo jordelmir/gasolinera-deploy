@@ -22,6 +22,11 @@ import {
   Bar,
 } from 'recharts';
 
+// Helper function to format numbers consistently
+const formatNumber = (num: number): string => {
+  return new Intl.NumberFormat('es-CR').format(num);
+};
+
 export default function DashboardPage() {
   // Mock data
   const mockData = {
@@ -115,7 +120,7 @@ export default function DashboardPage() {
               <div>
                 <p className="text-sm font-medium text-gray-600">Tickets Hoy</p>
                 <p className="text-2xl font-bold text-gray-900">
-                  {mockData.overview.totalTicketsToday.toLocaleString()}
+                  {formatNumber(mockData.overview.totalTicketsToday)}
                 </p>
                 <div className="flex items-center mt-1">
                   <ArrowUpIcon className="w-4 h-4 text-green-500" />
@@ -135,7 +140,7 @@ export default function DashboardPage() {
               <div>
                 <p className="text-sm font-medium text-gray-600">Ingresos</p>
                 <p className="text-2xl font-bold text-gray-900">
-                  ₡{mockData.overview.totalRevenue.toLocaleString()}
+                  ₡{formatNumber(mockData.overview.totalRevenue)}
                 </p>
                 <div className="flex items-center mt-1">
                   <ArrowDownIcon className="w-4 h-4 text-red-500" />
@@ -225,7 +230,7 @@ export default function DashboardPage() {
                         </p>
                         <p className="text-sm text-gray-500">
                           {station.tickets} tickets • ₡
-                          {station.revenue.toLocaleString()}
+                          {formatNumber(station.revenue)}
                         </p>
                       </div>
                     </div>

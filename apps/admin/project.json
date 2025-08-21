@@ -17,6 +17,24 @@
         },
         "production": {}
       }
+    },
+    "serve": {
+      "executor": "@nx/next:server",
+      "defaultConfiguration": "development",
+      "options": {
+        "buildTarget": "admin:build",
+        "dev": true
+      },
+      "configurations": {
+        "development": {
+          "buildTarget": "admin:build:development",
+          "dev": true
+        },
+        "production": {
+          "buildTarget": "admin:build:production",
+          "dev": false
+        }
+      }
     }
   },
   "tags": []

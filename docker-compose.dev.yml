@@ -1,59 +1,179 @@
 version: '3.8'
 
 services:
+  # Database
   postgres:
+    image: postgres:15-alpine
+    container_name: gasolinera-postgres-dev
+    environment:
+      POSTGRES_DB: puntog
+      POSTGRES_USER: puntog
+      POSTGRES_PASSWORD: changeme
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-puntog}']
+      test: ['CMD-SHELL', 'pg_isready -U puntog -d puntog']
       interval: 10s
       timeout: 5s
       retries: 5
 
+  # Redis for caching and sessions
   redis:
+    image: redis:7-alpine
+    container_name: gasolinera-redis-dev
+    ports:
+      - '6379:6379'
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
     healthcheck:
       test: ['CMD', 'redis-cli', 'ping']
       interval: 10s
       timeout: 5s
-      retries: 3
+      retries: 5
 
-  rabbitmq:
+  # Auth Service (Working)
+  auth-service:
+    build:
+      context: .
+      dockerfile: services/auth-service/Dockerfile
+    container_name: gasolinera-auth-service-dev
+    ports:
+      - '8081:8081'
+    environment:
+      - SPRING_PROFILES_ACTIVE=dev
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=puntog
+      - POSTGRES_USER=puntog
+      - POSTGRES_PASSWORD=changeme
+      - REDIS_HOST=redis
+      - JWT_SECRET=dev-secret-key-change-in-production
+      - JWT_REFRESH_SECRET=dev-refresh-secret-key-change-in-production
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     healthcheck:
-      test: ['CMD', 'rabbitmq-diagnostics', 'ping']
+      test: ['CMD', 'curl', '-f', 'http://localhost:8081/actuator/health']
       interval: 30s
       timeout: 10s
       retries: 3
+    restart: unless-stopped
 
-  vault:
+  # Coupon Service (Working)
+  coupon-service:
+    build:
+      context: .
+      dockerfile: services/coupon-service/Dockerfile
+    container_name: gasolinera-coupon-service-dev
+    ports:
+      - '8084:8084'
+    environment:
+      - SPRING_PROFILES_ACTIVE=dev
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=puntog
+      - POSTGRES_USER=puntog
+      - POSTGRES_PASSWORD=changeme
+      - REDIS_HOST=redis
+      - JWT_SECRET=dev-secret-key-change-in-production
+      - QR_EXPIRATION_MINUTES=15
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     healthcheck:
-      test: ['CMD', 'vault', 'status']
-      interval: 10s
-      timeout: 5s
+      test: ['CMD', 'curl', '-f', 'http://localhost:8084/actuator/health']
+      interval: 30s
+      timeout: 10s
       retries: 3
+    restart: unless-stopped
 
-  # Frontend services for development
-  admin-dev:
+  # Raffle Service
+  raffle-service:
     build:
       context: .
-      dockerfile: apps/admin/Dockerfile.dev
-    container_name: admin-dev
+      dockerfile: services/raffle-service/Dockerfile
+    container_name: gasolinera-raffle-service-dev
     ports:
-      - '3000:3000'
-    volumes:
-      - ./apps/admin:/app
-      - /app/node_modules
+      - '8085:8080'
     environment:
-      - NODE_ENV=development
-      - NEXT_PUBLIC_API_URL=http://localhost:8080
+      - SPRING_PROFILES_ACTIVE=dev
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=puntog
+      - POSTGRES_USER=puntog
+      - POSTGRES_PASSWORD=changeme
+      - REDIS_HOST=redis
+      - JWT_SECRET=dev-secret-key-change-in-production
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:8080/actuator/health']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
 
-  advertiser-dev:
+  # Redemption Service
+  redemption-service:
     build:
       context: .
-      dockerfile: apps/advertiser/Dockerfile.dev
-    container_name: advertiser-dev
+      dockerfile: services/redemption-service/Dockerfile
+    container_name: gasolinera-redemption-service-dev
     ports:
-      - '3001:3001'
-    volumes:
-      - ./apps/advertiser:/app
-      - /app/node_modules
+      - '8086:8080'
+    environment:
+      - SPRING_PROFILES_ACTIVE=dev
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=puntog
+      - POSTGRES_USER=puntog
+      - POSTGRES_PASSWORD=changeme
+      - REDIS_HOST=redis
+      - JWT_SECRET=dev-secret-key-change-in-production
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:8080/actuator/health']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  # Owner Dashboard (Frontend)
+  owner-dashboard:
+    build:
+      context: ./apps/owner-dashboard
+      dockerfile: Dockerfile
+    container_name: gasolinera-owner-dashboard-dev
+    ports:
+      - '3010:3000'
     environment:
       - NODE_ENV=development
-      - NEXT_PUBLIC_API_URL=http://localhost:8080
+      - NEXT_PUBLIC_API_URL=http://localhost:8081
+    depends_on:
+      - auth-service
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  default:
+    name: gasolinera-dev-network

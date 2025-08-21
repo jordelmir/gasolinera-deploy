@@ -4,45 +4,162 @@ server:
 spring:
   application:
     name: api-gateway
+
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}
+
   cloud:
     gateway:
-      routes:
-        - id: auth-service
-          uri: lb://auth-service
-          predicates:
-            - Path=/auth/**
-        - id: redemption-service
-          uri: lb://redemption-service
-          predicates:
-            - Path=/redeem/**
-        # Add other routes as services are created
-        # - id: station-service
-        #   uri: lb://station-service
-        #   predicates:
-        #     - Path=/stations/**
+      default-filters:
+        - DedupeResponseHeader=Access-Control-Allow-Credentials Access-Control-Allow-Origin
+      globalcors:
+        corsConfigurations:
+          '[/**]':
+            allowedOriginPatterns: '*'
+            allowedMethods:
+              - GET
+              - POST
+              - PUT
+              - DELETE
+              - OPTIONS
+            allowedHeaders: '*'
+            allowCredentials: true
+            maxAge: 3600
 
-  cloud:
-    vault:
-      enabled: true
-      scheme: http
-      host: localhost
-      port: 8200
-      authentication: TOKEN
-      token: ${VAULT_TOKEN:myroottoken}
-      kv:
+      # Circuit breaker configuration
+      httpclient:
+        connect-timeout: 5000
+        response-timeout: 30s
+        pool:
+          max-connections: 100
+          max-idle-time: 30s
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${JWT_ISSUER_URI:http://auth-service:8081}
+          jwk-set-uri: ${JWT_JWK_SET_URI:http://auth-service:8081/.well-known/jwks.json}
+
+# Resilience4j Circuit Breaker Configuration
+resilience4j:
+  circuitbreaker:
+    instances:
+      ad-engine-cb:
+        registerHealthIndicator: true
+        slidingWindowSize: 10
+        minimumNumberOfCalls: 5
+        permittedNumberOfCallsInHalfOpenState: 3
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+        waitDurationInOpenState: 5s
+        failureRateThreshold: 50
+        eventConsumerBufferSize: 10
+      raffle-service-cb:
+        registerHealthIndicator: true
+        slidingWindowSize: 10
+        minimumNumberOfCalls: 5
+        permittedNumberOfCallsInHalfOpenState: 3
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+        waitDurationInOpenState: 5s
+        failureRateThreshold: 50
+        eventConsumerBufferSize: 10
+      redemption-service-cb:
+        registerHealthIndicator: true
+        slidingWindowSize: 10
+        minimumNumberOfCalls: 5
+        permittedNumberOfCallsInHalfOpenState: 3
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+        waitDurationInOpenState: 5s
+        failureRateThreshold: 50
+        eventConsumerBufferSize: 10
+
+# Actuator configuration
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus,gateway
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    export:
+      prometheus:
         enabled: true
-        backend: secret
-        profile-separator: /
-        default-context: application
-        application-name: ${spring.application.name}
 
-# Service discovery for docker-compose will use container names
-# For Kubernetes, this would use service names e.g., http://auth-service:8081
-auth-service:
-  uri: http://auth-service:8081
-redemption-service:
-  uri: http://redemption-service:8082
-ad-engine:
-  url: http://ad-engine:8083 # Assuming ad-engine runs on port 8083
-redemption-service:
-  url: http://redemption-service:8084 # Assuming redemption-service runs on port 8084
+# Logging configuration
+logging:
+  level:
+    org.springframework.cloud.gateway: DEBUG
+    org.springframework.security: DEBUG
+    com.gasolinerajsm.apigateway: DEBUG
+  pattern:
+    console: '%d{yyyy-MM-dd HH:mm:ss} - %msg%n'
+    file: '%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n'
+
+# Service URLs (can be overridden by environment variables)
+services:
+  auth-service:
+    url: ${AUTH_SERVICE_URL:http://auth-service:8081}
+  coupon-service:
+    url: ${COUPON_SERVICE_URL:http://coupon-service:8084}
+  station-service:
+    url: ${STATION_SERVICE_URL:http://station-service:8083}
+  ad-engine:
+    url: ${AD_ENGINE_URL:http://ad-engine:8082}
+  raffle-service:
+    url: ${RAFFLE_SERVICE_URL:http://raffle-service:8085}
+  redemption-service:
+    url: ${REDEMPTION_SERVICE_URL:http://redemption-service:8086}
+
+---
+# Development profile
+spring:
+  config:
+    activate:
+      on-profile: dev
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://localhost:8081
+          jwk-set-uri: http://localhost:8081/.well-known/jwks.json
+
+services:
+  auth-service:
+    url: http://localhost:8081
+  coupon-service:
+    url: http://localhost:8084
+  station-service:
+    url: http://localhost:8083
+  ad-engine:
+    url: http://localhost:8082
+  raffle-service:
+    url: http://localhost:8085
+  redemption-service:
+    url: http://localhost:8086
+
+logging:
+  level:
+    root: INFO
+    com.gasolinerajsm.apigateway: DEBUG
+
+---
+# Production profile
+spring:
+  config:
+    activate:
+      on-profile: prod
+
+logging:
+  level:
+    root: WARN
+    com.gasolinerajsm.apigateway: INFO
+  file:
+    name: /var/log/api-gateway.log
+
+management:
+  endpoint:
+    health:
+      show-details: when-authorized

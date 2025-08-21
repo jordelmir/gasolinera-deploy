@@ -1,12 +1,11 @@
-import
-org.springframework.boot.gradle.tasks.bundling.BootJar
+
 
 plugins {
-    id("org.springframework.boot") version "3.3.3"
-    id("io.spring.dependency-management") version "1.1.6"
-    kotlin("jvm") version "1.9.24"
-    kotlin("plugin.spring") version "1.9.24"
-    kotlin("plugin.jpa") version "1.9.24"
+    id("org.springframework.boot")
+    id("io.spring.dependency-management")
+    kotlin("jvm")
+    kotlin("plugin.spring")
+    kotlin("plugin.jpa")
 }
 
 group = "com.gasolinerajsm"
@@ -36,11 +35,15 @@ dependencies {
 
     // --- OpenTelemetry Tracing ---
     implementation("io.micrometer:micrometer-tracing-bridge-brave")
-    implementation("io.micrometer:micrometer-tracing-reporter-brave")
     implementation("io.opentelemetry:opentelemetry-exporter-otlp")
 
     // --- Kafka ---
     implementation("org.springframework.kafka:spring-kafka") // NUEVO
+
+    // --- JWT ---
+    implementation("io.jsonwebtoken:jjwt-api:0.11.5")
+    runtimeOnly("io.jsonwebtoken:jjwt-impl:0.11.5")
+    runtimeOnly("io.jsonwebtoken:jjwt-jackson:0.11.5")
 
     // --- Logging ---
     implementation("net.logstash.logback:logstash-logback-encoder:7.4") // For structured JSON logging
@@ -71,7 +74,6 @@ tasks.withType<Test> {
     useJUnitPlatform()
 }
 
-tasks.getByName<BootJar>("bootJar") {
+tasks.getByName<org.springframework.boot.gradle.tasks.bundling.BootJar>("bootJar") {
     archiveFileName.set("ad-engine.jar")
-    mainClassName = "com.gasolinerajsm.adengine.AdEngineApplicationKt"
 }

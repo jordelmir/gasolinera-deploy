@@ -4,16 +4,16 @@ package com.gasolinerajsm.apigateway
 import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.boot.runApplication
 
+/**
+ * API Gateway Application using Spring Cloud Gateway
+ *
+ * This service acts as the main entry point for all client requests,
+ * routing them to appropriate microservices and handling cross-cutting concerns
+ * like authentication, logging, and circuit breaking.
+ */
 @SpringBootApplication
 class ApiGatewayApplication
 
 fun main(args: Array<String>) {
-    try {
-        runApplication<ApiGatewayApplication>(*args)
-    } catch (e: Exception) {
-        System.err.println("API Gateway application failed to start: ${e.message}")
-        e.printStackTrace()
-        // In a real app, you might want to log this to a proper logging system
-        // and potentially trigger alerts.
-    }
+    runApplication<ApiGatewayApplication>(*args)
 }

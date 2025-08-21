@@ -10,7 +10,7 @@ import 'react-toastify/dist/ReactToastify.css';
 export default function Providers({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const token = useAuthStore((state) => state.token);
+  const accessToken = useAuthStore((state) => state.accessToken);
 
   useEffect(() => {
     // List of routes that require authentication
@@ -20,11 +20,11 @@ export default function Providers({ children }: { children: React.ReactNode }) {
     const isProtectedRoute = protectedRoutes.some(route => pathname.startsWith(route));
 
     // If on a protected route and no token, redirect to login
-    if (isProtectedRoute && !token) {
+    if (isProtectedRoute && !accessToken) {
       router.push('/login');
     }
     // If on login page and already authenticated, redirect to dashboard
-    else if (pathname === '/login' && token) {
+    else if (pathname === '/login' && accessToken) {
       router.push('/dashboard');
     }
   }, [token, pathname, router]);

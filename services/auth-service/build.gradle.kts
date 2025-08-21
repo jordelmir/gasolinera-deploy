@@ -1,29 +1,28 @@
 import org.springframework.boot.gradle.tasks.bundling.BootJar
 
 plugins {
-    id("org.springframework.boot") version "3.3.3"
-    id("io.spring.dependency-management") version "1.1.6"
-    kotlin("jvm") version "1.9.24"
-    kotlin("plugin.spring") version "1.9.24"
-    id("io.gitlab.arturbosch.detekt") version "1.23.6" // Detekt plugin
+    id("org.springframework.boot")
+    id("io.spring.dependency-management")
+    kotlin("jvm")
+    kotlin("plugin.spring")
+    id("io.gitlab.arturbosch.detekt")
 }
 
 detekt {
-    toolVersion = "1.23.6"
+    toolVersion = "1.23.7"
     buildUponDefaultConfig = true
-    allRules = false // Set to true to enable all rules, or false to use default config
-    // config = files("${project.rootDir}/detekt-config.yml") // Optional: path to custom Detekt config
-    baseline = file("detekt-baseline.xml") // Optional: path to Detekt baseline file
-    reports {
-        xml { enabled = true }
-        html { enabled = true }
-        txt { enabled = false }
-        sarif { enabled = false }
-    }
+    allRules = false
+    baseline = file("detekt-baseline.xml")
 }
 
-dependencies {
-    detektPlugins("io.gitlab.arturbosch.detekt:detekt-formatting:1.23.6") // Detekt formatting rules
+tasks.withType<io.gitlab.arturbosch.detekt.Detekt>().configureEach {
+    reports {
+        xml.required.set(true)
+        html.required.set(true)
+        txt.required.set(false)
+        sarif.required.set(false)
+    }
+}
 
 group = "com.gasolinerajsm"
 version = "0.0.1-SNAPSHOT"
@@ -39,6 +38,7 @@ repositories {
 }
 
 dependencies {
+    detektPlugins("io.gitlab.arturbosch.detekt:detekt-formatting:1.23.7") // Detekt formatting rules
     // --- Spring Boot Starters ---
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-validation")
@@ -46,14 +46,13 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-data-redis")
     implementation("org.springframework.boot:spring-boot-starter-security")
     implementation("org.springframework.cloud:spring-cloud-starter-vault-config:4.1.3")
-    
+
     // --- Observabilidad (Actuator + Prometheus) ---
     implementation("org.springframework.boot:spring-boot-starter-actuator") // NUEVO
     implementation("io.micrometer:micrometer-registry-prometheus")   // NUEVO
 
     // --- OpenTelemetry Tracing ---
     implementation("io.micrometer:micrometer-tracing-bridge-brave")
-    implementation("io.micrometer:micrometer-tracing-reporter-brave")
     implementation("io.opentelemetry:opentelemetry-exporter-otlp")
 
     // --- Logging ---
@@ -90,7 +89,6 @@ tasks.withType<Test> {
     useJUnitPlatform()
 }
 
-tasks.getByName<BootJar>("bootJar") {
+tasks.getByName<org.springframework.boot.gradle.tasks.bundling.BootJar>("bootJar") {
     archiveFileName.set("auth-service.jar")
-    mainClassName = "com.gasolinerajsm.authservice.AuthServiceApplicationKt"
 }
