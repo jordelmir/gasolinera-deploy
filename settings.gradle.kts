@@ -16,5 +16,9 @@ include(
     "packages:internal-sdk", // NEW
     "services:raffle-service",
     "services:redemption-service",
+    "integration-tests", // Integration tests module
+    "shared:messaging",
+    "shared:security",
+    "shared:common"
     // "packages:temp-sdk"
 )

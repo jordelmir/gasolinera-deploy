@@ -1,0 +1,261 @@
+version: '3.8'
+
+services:
+  # Jaeger All-in-One (for development)
+  jaeger-dev:
+    image: jaegertracing/all-in-one:1.50
+    container_name: gasolinera-jaeger-dev
+    restart: unless-stopped
+    ports:
+      - '16686:16686' # Jaeger UI
+      - '14268:14268' # Jaeger collector HTTP
+      - '14250:14250' # Jaeger collector gRPC
+      - '6831:6831/udp' # Jaeger agent UDP (compact)
+      - '6832:6832/udp' # Jaeger agent UDP (binary)
+      - '5778:5778' # Jaeger agent config
+      - '4317:4317' # OTLP gRPC receiver
+      - '4318:4318' # OTLP HTTP receiver
+    environment:
+      COLLECTOR_OTLP_ENABLED: true
+      COLLECTOR_ZIPKIN_HOST_PORT: ':9411'
+      SPAN_STORAGE_TYPE: memory
+      JAEGER_DISABLED: false
+      JAEGER_SAMPLER_TYPE: const
+      JAEGER_SAMPLER_PARAM: 1
+    networks:
+      - gasolinera-network
+    profiles:
+      - development
+
+  # Production Jaeger Setup with Elasticsearch
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+    container_name: gasolinera-elasticsearch
+    restart: unless-stopped
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - 'ES_JAVA_OPTS=-Xms512m -Xmx512m'
+      - bootstrap.memory_lock=true
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    ports:
+      - '9200:9200'
+    networks:
+      - gasolinera-network
+    profiles:
+      - production
+    healthcheck:
+      test:
+        ['CMD-SHELL', 'curl -f http://localhost:9200/_cluster/health || exit 1']
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # Jaeger Collector (Production)
+  jaeger-collector:
+    image: jaegertracing/jaeger-collector:1.50
+    container_name: gasolinera-jaeger-collector
+    restart: unless-stopped
+    ports:
+      - '14269:14269' # Admin port
+      - '14268:14268' # HTTP collector
+      - '14250:14250' # gRPC collector
+      - '9411:9411' # Zipkin compatible
+      - '4317:4317' # OTLP gRPC
+      - '4318:4318' # OTLP HTTP
+    environment:
+      SPAN_STORAGE_TYPE: elasticsearch
+      ES_SERVER_URLS: http://elasticsearch:9200
+      ES_NUM_SHARDS: 1
+      ES_NUM_REPLICAS: 0
+      ES_INDEX_PREFIX: jaeger
+      COLLECTOR_OTLP_ENABLED: true
+      COLLECTOR_ZIPKIN_HOST_PORT: ':9411'
+      LOG_LEVEL: info
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    networks:
+      - gasolinera-network
+    profiles:
+      - production
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'wget',
+          '--quiet',
+          '--tries=1',
+          '--spider',
+          'http://localhost:14269/',
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Jaeger Query (Production)
+  jaeger-query:
+    image: jaegertracing/jaeger-query:1.50
+    container_name: gasolinera-jaeger-query
+    restart: unless-stopped
+    ports:
+      - '16686:16686' # Jaeger UI
+      - '16687:16687' # Admin port
+    environment:
+      SPAN_STORAGE_TYPE: elasticsearch
+      ES_SERVER_URLS: http://elasticsearch:9200
+      ES_INDEX_PREFIX: jaeger
+      QUERY_BASE_PATH: /
+      LOG_LEVEL: info
+    depends_on:
+      - elasticsearch
+      - jaeger-collector
+    networks:
+      - gasolinera-network
+    profiles:
+      - production
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'wget',
+          '--quiet',
+          '--tries=1',
+          '--spider',
+          'http://localhost:16687/',
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Jaeger Agent (Production - optional sidecar)
+  jaeger-agent:
+    image: jaegertracing/jaeger-agent:1.50
+    container_name: gasolinera-jaeger-agent
+    restart: unless-stopped
+    ports:
+      - '5775:5775/udp' # Zipkin compact
+      - '6831:6831/udp' # Jaeger compact
+      - '6832:6832/udp' # Jaeger binary
+      - '5778:5778' # Config server
+    environment:
+      REPORTER_GRPC_HOST_PORT: jaeger-collector:14250
+      LOG_LEVEL: info
+    depends_on:
+      - jaeger-collector
+    networks:
+      - gasolinera-network
+    profiles:
+      - production
+
+  # OpenTelemetry Collector (Alternative/Additional)
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.88.0
+    container_name: gasolinera-otel-collector
+    restart: unless-stopped
+    command: ['--config=/etc/otel-collector-config.yml']
+    volumes:
+      - ./otel-collector-config.yml:/etc/otel-collector-config.yml:ro
+    ports:
+      - '4317:4317' # OTLP gRPC receiver
+      - '4318:4318' # OTLP HTTP receiver
+      - '8888:8888' # Prometheus metrics
+      - '8889:8889' # Prometheus exporter metrics
+      - '13133:13133' # Health check
+    depends_on:
+      - jaeger-collector
+    networks:
+      - gasolinera-network
+    profiles:
+      - otel
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'wget',
+          '--quiet',
+          '--tries=1',
+          '--spider',
+          'http://localhost:13133/',
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Zipkin (Alternative tracing backend)
+  zipkin:
+    image: openzipkin/zipkin:2.24
+    container_name: gasolinera-zipkin
+    restart: unless-stopped
+    ports:
+      - '9411:9411'
+    environment:
+      STORAGE_TYPE: elasticsearch
+      ES_HOSTS: http://elasticsearch:9200
+      ES_INDEX: zipkin
+    depends_on:
+      - elasticsearch
+    networks:
+      - gasolinera-network
+    profiles:
+      - zipkin
+    healthcheck:
+      test: ['CMD-SHELL', 'curl -f http://localhost:9411/health || exit 1']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Jaeger Spark Dependencies (for service dependency analysis)
+  jaeger-spark-dependencies:
+    image: jaegertracing/spark-dependencies:latest
+    container_name: gasolinera-jaeger-dependencies
+    environment:
+      STORAGE: elasticsearch
+      ES_NODES: http://elasticsearch:9200
+      ES_INDEX_PREFIX: jaeger
+    depends_on:
+      - elasticsearch
+    networks:
+      - gasolinera-network
+    profiles:
+      - production
+    # Run daily at 2 AM
+    deploy:
+      restart_policy:
+        condition: none
+    # This would typically be run as a cron job
+
+  # Elasticsearch Curator (for index management)
+  elasticsearch-curator:
+    image: untergeek/curator:8.0.4
+    container_name: gasolinera-es-curator
+    volumes:
+      - ./curator-config.yml:/etc/curator/config.yml:ro
+      - ./curator-actions.yml:/etc/curator/actions.yml:ro
+    depends_on:
+      - elasticsearch
+    networks:
+      - gasolinera-network
+    profiles:
+      - production
+    # Run daily for cleanup
+    command:
+      [
+        'curator',
+        '--config',
+        '/etc/curator/config.yml',
+        '/etc/curator/actions.yml',
+      ]
+
+volumes:
+  elasticsearch_data:
+    driver: local
+
+networks:
+  gasolinera-network:
+    external: true

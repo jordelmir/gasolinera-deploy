@@ -1,0 +1,196 @@
+# Performance Test Configuration
+spring:
+  profiles:
+    active: performance-test
+
+  # Database configuration optimized for performance testing
+  datasource:
+    url: jdbc:postgresql://localhost:5432/gasolinera_perf_db
+    username: perf_user
+    password: perf_password
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 50
+      minimum-idle: 10
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      leak-detection-threshold: 60000
+
+  # JPA Configuration for performance
+  jpa:
+    hibernate:
+      ddl-auto: none
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: false
+        jdbc:
+          batch_size: 50
+          batch_versioned_data: true
+        order_inserts: true
+        order_updates: true
+        generate_statistics: false
+
+  # Redis Configuration for performance
+  redis:
+    host: localhost
+    port: 6379
+    password: perf_password
+    timeout: 5000ms
+    lettuce:
+      pool:
+        max-active: 100
+        max-idle: 50
+        min-idle: 10
+        max-wait: 5000ms
+
+  # RabbitMQ Configuration for performance
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: perf_user
+    password: perf_password
+    virtual-host: perf_vhost
+    connection-timeout: 30000
+    publisher-confirms: true
+    publisher-returns: true
+    template:
+      retry:
+        enabled: true
+        initial-interval: 1000ms
+        max-attempts: 3
+        max-interval: 10000ms
+        multiplier: 2.0
+
+# Logging Configuration for performance tests
+logging:
+  level:
+    com.gasolinerajsm: INFO
+    org.springframework.web: WARN
+    org.springframework.security: WARN
+    org.hibernate: WARN
+    org.postgresql: WARN
+  pattern:
+    console: '%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n'
+
+# Management endpoints for monitoring
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+
+# Performance test configuration
+performance:
+  test:
+    # Test execution parameters
+    duration: ${performance.test.duration:300} # seconds
+    concurrent-users: ${performance.test.users:100}
+    ramp-up-time: 60 # seconds
+    ramp-down-time: 30 # seconds
+
+    # Request configuration
+    request:
+      timeout: 30s
+      connection-timeout: 10s
+      read-timeout: 30s
+      retry-attempts: 3
+      retry-delay: 1s
+
+    # Load patterns
+    patterns:
+      steady-load:
+        users: 100
+        duration: 300
+        ramp-up: 60
+
+      spike-load:
+        users: 500
+        duration: 120
+        ramp-up: 10
+
+      stress-load:
+        users: 1000
+        duration: 600
+        ramp-up: 120
+
+    # Service endpoints
+    services:
+      auth-service:
+        base-url: http://localhost:8081
+        endpoints:
+          login: /api/auth/login
+          otp: /api/auth/otp/request
+          profile: /api/auth/user/profile
+
+      coupon-service:
+        base-url: http://localhost:8083
+        endpoints:
+          validate: /api/coupons/validate
+          available: /api/coupons/available
+          campaigns: /api/campaigns/active
+
+      redemption-service:
+        base-url: http://localhost:8084
+        endpoints:
+          redeem: /api/redemptions
+          history: /api/redemptions/history
+
+      api-gateway:
+        base-url: http://localhost:8080
+        endpoints:
+          health: /actuator/health
+          metrics: /actuator/metrics
+
+    # Test data configuration
+    data:
+      users:
+        total: 1000
+        phone-prefix: '+525555'
+        phone-start: 100000
+        roles: ['CUSTOMER', 'EMPLOYEE', 'STATION_ADMIN']
+
+      coupons:
+        codes-prefix: 'PERF'
+        campaigns: ['WELCOME2024', 'SUMMER2024', 'PREMIUM2024']
+
+      stations:
+        ids: [1, 2, 3, 4, 5]
+        default-id: 1
+
+    # Performance thresholds
+    thresholds:
+      response-time:
+        p50: 200ms # 50th percentile
+        p95: 500ms # 95th percentile
+        p99: 1000ms # 99th percentile
+        max: 5000ms # Maximum acceptable
+
+      throughput:
+        min-rps: 50 # Minimum requests per second
+        target-rps: 200 # Target requests per second
+
+      error-rate:
+        max-percentage: 1.0 # Maximum 1% error rate
+
+      resource-usage:
+        max-cpu: 80.0 # Maximum 80% CPU usage
+        max-memory: 85.0 # Maximum 85% memory usage
+        max-connections: 80.0 # Maximum 80% of connection pool
+
+    # Reporting configuration
+    reporting:
+      enabled: true
+      output-dir: build/reports/performance
+      formats: ['html', 'json', 'csv']
+      include-graphs: true
+      detailed-metrics: true

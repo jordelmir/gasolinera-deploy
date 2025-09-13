@@ -1,0 +1,346 @@
+# Alertmanager Configuration for Gasolinera JSM
+global:
+  smtp_smarthost: "localhost:587"
+  smtp_from: "alerts@gasolinera-jsm.com"
+  smtp_auth_username: "alerts@gasolinera-jsm.com"
+  smtp_auth_password: "${SMTP_PASSWORD}"
+  slack_api_url: "${SLACK_WEBHOOK_URL}"
+
+# Templates for alert notifications
+templates:
+  - "/etc/alertmanager/templates/*.tmpl"
+
+# Route tree for alert routing
+route:
+  group_by: ["alertname", "cluster", "service"]
+  group_wait: 10s
+  group_interval: 10s
+  repeat_interval: 1h
+  receiver: "default-receiver"
+
+  routes:
+    # Critical alerts - immediate notification
+    - match:
+        severity: critical
+      receiver: "critical-alerts"
+      group_wait: 0s
+      repeat_interval: 5m
+      routes:
+        # Database down - immediate escalation
+        - match:
+            alertname: PostgreSQLDown
+        - match:
+            alertname: RedisDown
+        - match:
+            alertname: RabbitMQDown
+          receiver: "infrastructure-critical"
+
+        # Application critical issues
+        - match:
+            alertname: CriticalResponseTime
+        - match:
+            alertname: CriticalErrorRate
+        - match:
+            alertname: CriticalMemoryUsage
+          receiver: "application-critical"
+
+        # Business critical issues
+        - match:
+            alertname: RaffleDrawFailure
+        - match:
+            alertname: SLAViolationAvailability
+          receiver: "business-critical"
+
+    # Warning alerts - standard notification
+    - match:
+        severity: warning
+      receiver: "warning-alerts"
+      group_wait: 30s
+      repeat_interval: 30m
+      routes:
+        # Performance warnings
+        - match:
+            team: backend
+          receiver: "backend-warnings"
+
+        # Infrastructure warnings
+        - match:
+            team: infrastructure
+          receiver: "infrastructure-warnings"
+
+        # Business warnings
+        - match:
+            team: business
+          receiver: "business-warnings"
+
+    # SLA violations - special handling
+    - match:
+        team: sre
+      receiver: "sla-violations"
+      group_wait: 0s
+      repeat_interval: 15m
+
+    # Maintenance alerts - low priority
+    - match:
+        severity: info
+      receiver: "maintenance-alerts"
+      group_wait: 5m
+      repeat_interval: 4h
+
+# Inhibition rules to prevent alert spam
+inhibit_rules:
+  # Inhibit warning alerts if critical alert is firing
+  - source_match:
+      severity: "critical"
+    target_match:
+      severity: "warning"
+    equal: ["alertname", "service", "instance"]
+
+  # Inhibit individual service alerts if entire cluster is down
+  - source_match:
+      alertname: "ClusterDown"
+    target_match_re:
+      alertname: ".*Service.*"
+    equal: ["cluster"]
+
+  # Inhibit memory alerts if service is down
+  - source_match:
+      alertname: "ServiceDown"
+    target_match:
+      alertname: "HighMemoryUsage"
+    equal: ["service", "instance"]
+
+# Receivers define notification destinations
+receivers:
+  # Default receiver
+  - name: "default-receiver"
+    slack_configs:
+      - api_url: "${SLACK_WEBHOOK_URL}"
+        channel: "#gasolinera-alerts"
+        title: "Gasolinera JSM Alert"
+        text: |
+          {{ range .Alerts }}
+          *Alert:* {{ .Annotations.summary }}
+          *Description:* {{ .Annotations.description }}
+          *Severity:* {{ .Labels.severity }}
+          *Service:* {{ .Labels.service }}
+          {{ end }}
+        send_resolved: true
+
+  # Critical alerts - multiple channels
+  - name: "critical-alerts"
+    slack_configs:
+      - api_url: "${SLACK_WEBHOOK_URL}"
+        channel: "#gasolinera-critical"
+        title: "🚨 CRITICAL ALERT - Gasolinera JSM"
+        text: |
+          <!channel>
+          {{ range .Alerts }}
+          *🚨 CRITICAL ALERT 🚨*
+          *Alert:* {{ .Annotations.summary }}
+          *Description:* {{ .Annotations.description }}
+          *Service:* {{ .Labels.service }}
+          *Runbook:* {{ .Annotations.runbook_url }}
+          *Time:* {{ .StartsAt.Format "2006-01-02 15:04:05" }}
+          {{ end }}
+        send_resolved: true
+
+    email_configs:
+      - to: "oncall@gasolinera-jsm.com"
+        subject: "🚨 CRITICAL: {{ .GroupLabels.alertname }} - {{ .GroupLabels.service }}"
+        body: |
+          Critical alert fired in Gasolinera JSM:
+
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Service: {{ .Labels.service }}
+          Severity: {{ .Labels.severity }}
+          Runbook: {{ .Annotations.runbook_url }}
+          Started: {{ .StartsAt.Format "2006-01-02 15:04:05 MST" }}
+          {{ end }}
+
+        headers:
+          Priority: "high"
+
+    pagerduty_configs:
+      - routing_key: "${PAGERDUTY_ROUTING_KEY}"
+        description: "{{ .GroupLabels.alertname }} - {{ .GroupLabels.service }}"
+        severity: "critical"
+
+  # Infrastructure critical alerts
+  - name: "infrastructure-critical"
+    slack_configs:
+      - api_url: "${SLACK_WEBHOOK_URL}"
+        channel: "#gasolinera-infrastructure"
+        title: "🔥 INFRASTRUCTURE CRITICAL - Gasolinera JSM"
+        text: |
+          <!channel>
+          {{ range .Alerts }}
+          *🔥 INFRASTRUCTURE DOWN 🔥*
+          *Component:* {{ .Labels.job }}
+          *Issue:* {{ .Annotations.summary }}
+          *Impact:* {{ .Annotations.description }}
+          *Action Required:* Immediate intervention needed
+          {{ end }}
+        send_resolved: true
+
+    email_configs:
+      - to: "devops@gasolinera-jsm.com,cto@gasolinera-jsm.com"
+        subject: "🔥 INFRASTRUCTURE CRITICAL: {{ .GroupLabels.alertname }}"
+
+  # Application critical alerts
+  - name: "application-critical"
+    slack_configs:
+      - api_url: "${SLACK_WEBHOOK_URL}"
+        channel: "#gasolinera-backend"
+        title: "⚠️ APPLICATION CRITICAL - Gasolinera JSM"
+        text: |
+          <!here>
+          {{ range .Alerts }}
+          *⚠️ APPLICATION CRITICAL ⚠️*
+          *Service:* {{ .Labels.service }}
+          *Issue:* {{ .Annotations.summary }}
+          *Details:* {{ .Annotations.description }}
+          *Runbook:* {{ .Annotations.runbook_url }}
+          {{ end }}
+        send_resolved: true
+
+  # Business critical alerts
+  - name: "business-critical"
+    slack_configs:
+      - api_url: "${SLACK_WEBHOOK_URL}"
+        channel: "#gasolinera-business"
+        title: "💼 BUSINESS CRITICAL - Gasolinera JSM"
+        text: |
+          <!channel>
+          {{ range .Alerts }}
+          *💼 BUSINESS IMPACT 💼*
+          *Issue:* {{ .Annotations.summary }}
+          *Business Impact:* {{ .Annotations.description }}
+          *Revenue Impact:* Potential revenue loss
+          *Action:* Immediate business continuity measures required
+          {{ end }}
+        send_resolved: true
+
+    email_configs:
+      - to: "business@gasolinera-jsm.com,management@gasolinera-jsm.com"
+        subject: "💼 BUSINESS CRITICAL: {{ .GroupLabels.alertname }}"
+
+  # Warning alerts
+  - name: "warning-alerts"
+    slack_configs:
+      - api_url: "${SLACK_WEBHOOK_URL}"
+        channel: "#gasolinera-alerts"
+        title: "⚠️ Warning - Gasolinera JSM"
+        text: |
+          {{ range .Alerts }}
+          *⚠️ Warning Alert*
+          *Service:* {{ .Labels.service }}
+          *Issue:* {{ .Annotations.summary }}
+          *Details:* {{ .Annotations.description }}
+          *Severity:* {{ .Labels.severity }}
+          {{ end }}
+        send_resolved: true
+
+  # Backend team warnings
+  - name: "backend-warnings"
+    slack_configs:
+      - api_url: "${SLACK_WEBHOOK_URL}"
+        channel: "#gasolinera-backend"
+        title: "⚠️ Backend Warning - Gasolinera JSM"
+        text: |
+          {{ range .Alerts }}
+          *⚠️ Backend Performance Warning*
+          *Service:* {{ .Labels.service }}
+          *Metric:* {{ .Annotations.summary }}
+          *Current Value:* {{ .Annotations.description }}
+          *Runbook:* {{ .Annotations.runbook_url }}
+          {{ end }}
+        send_resolved: true
+
+  # Infrastructure warnings
+  - name: "infrastructure-warnings"
+    slack_configs:
+      - api_url: "${SLACK_WEBHOOK_URL}"
+        channel: "#gasolinera-infrastructure"
+        title: "🔧 Infrastructure Warning - Gasolinera JSM"
+        text: |
+          {{ range .Alerts }}
+          *🔧 Infrastructure Warning*
+          *Component:* {{ .Labels.job }}
+          *Issue:* {{ .Annotations.summary }}
+          *Details:* {{ .Annotations.description }}
+          *Trend:* Monitor for escalation
+          {{ end }}
+        send_resolved: true
+
+  # Business warnings
+  - name: "business-warnings"
+    slack_configs:
+      - api_url: "${SLACK_WEBHOOK_URL}"
+        channel: "#gasolinera-business"
+        title: "📊 Business Metrics Warning - Gasolinera JSM"
+        text: |
+          {{ range .Alerts }}
+          *📊 Business Metrics Alert*
+          *Metric:* {{ .Annotations.summary }}
+          *Current State:* {{ .Annotations.description }}
+          *Business Impact:* Monitor for trends
+          {{ end }}
+        send_resolved: true
+
+  # SLA violations
+  - name: "sla-violations"
+    slack_configs:
+      - api_url: "${SLACK_WEBHOOK_URL}"
+        channel: "#gasolinera-sre"
+        title: "📋 SLA Violation - Gasolinera JSM"
+        text: |
+          {{ range .Alerts }}
+          *📋 SLA VIOLATION*
+          *SLA Type:* {{ .Labels.sla }}
+          *Service:* {{ .Labels.service }}
+          *Violation:* {{ .Annotations.summary }}
+          *Impact:* {{ .Annotations.description }}
+          *Error Budget:* Being consumed
+          {{ end }}
+        send_resolved: true
+
+    email_configs:
+      - to: "sre@gasolinera-jsm.com"
+        subject: "📋 SLA Violation: {{ .GroupLabels.sla }} - {{ .GroupLabels.service }}"
+
+  # Maintenance alerts
+  - name: "maintenance-alerts"
+    slack_configs:
+      - api_url: "${SLACK_WEBHOOK_URL}"
+        channel: "#gasolinera-maintenance"
+        title: "ℹ️ Maintenance Alert - Gasolinera JSM"
+        text: |
+          {{ range .Alerts }}
+          *ℹ️ Maintenance Required*
+          *Component:* {{ .Labels.service }}
+          *Issue:* {{ .Annotations.summary }}
+          *Priority:* Low
+          *Schedule:* Next maintenance window
+          {{ end }}
+        send_resolved: true
+
+# Time-based silencing (optional)
+time_intervals:
+  - name: "business-hours"
+    time_intervals:
+      - times:
+          - start_time: "09:00"
+            end_time: "18:00"
+        weekdays: ["monday:friday"]
+        location: "America/Mexico_City"
+
+  - name: "maintenance-window"
+    time_intervals:
+      - times:
+          - start_time: "02:00"
+            end_time: "04:00"
+        weekdays: ["sunday"]
+        location: "America/Mexico_City"

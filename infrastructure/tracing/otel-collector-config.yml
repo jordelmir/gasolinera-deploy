@@ -1,0 +1,256 @@
+# OpenTelemetry Collector Configuration for Gasolinera JSM
+# Receives, processes, and exports telemetry data
+
+receivers:
+  # OTLP receiver for traces, metrics, and logs
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+        cors:
+          allowed_origins:
+            - "http://localhost:*"
+            - "https://*.gasolinerajsm.com"
+
+  # Jaeger receiver (for backward compatibility)
+  jaeger:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:14250
+      thrift_http:
+        endpoint: 0.0.0.0:14268
+      thrift_compact:
+        endpoint: 0.0.0.0:6831
+      thrift_binary:
+        endpoint: 0.0.0.0:6832
+
+  # Zipkin receiver (for compatibility)
+  zipkin:
+    endpoint: 0.0.0.0:9411
+
+  # Prometheus receiver for metrics
+  prometheus:
+    config:
+      scrape_configs:
+        - job_name: 'otel-collector'
+          scrape_interval: 30s
+          static_configs:
+            - targets: ['localhost:8888']
+
+processors:
+  # Batch processor for better performance
+  batch:
+    timeout: 1s
+    send_batch_size: 1024
+    send_batch_max_size: 2048
+
+  # Memory limiter to prevent OOM
+  memory_limiter:
+    limit_mib: 512
+    spike_limit_mib: 128
+    check_interval: 5s
+
+  # Resource processor to add/modify resource attributes
+  resource:
+    attributes:
+      - key: service.namespace
+        value: gasolinera-jsm
+        action: upsert
+      - key: deployment.environment
+        from_attribute: environment
+        action: insert
+      - key: service.instance.id
+        from_attribute: host.name
+        action: insert
+
+  # Attributes processor for span attributes
+  attributes:
+    actions:
+      # Remove sensitive information
+      - key: http.request.header.authorization
+        action: delete
+      - key: http.request.header.cookie
+        action: delete
+      - key: db.statement
+        action: update
+        from_attribute: db.statement
+        # Sanitize SQL statements (remove values)
+
+      # Add business context
+      - key: business.domain
+        value: loyalty-program
+        action: insert
+
+      # Normalize HTTP methods
+      - key: http.method
+        action: update
+        from_attribute: http.method
+        # Convert to uppercase
+
+  # Span processor for span modifications
+  span:
+    name:
+      # Rename spans for better organization
+      to_attributes:
+        rules:
+          - pattern: ^(GET|POST|PUT|DELETE|PATCH)\s+(.*)$
+            name_pattern: "HTTP $1"
+      from_attributes:
+        - "http.method"
+        - "http.route"
+
+  # Probabilistic sampler
+  probabilistic_sampler:
+    sampling_percentage: 10.0  # 10% sampling
+
+  # Tail sampling for more sophisticated sampling
+  tail_sampling:
+    decision_wait: 10s
+    num_traces: 50000
+    expected_new_traces_per_sec: 100
+    policies:
+      # Always sample error traces
+      - name: error-policy
+        type: status_code
+        status_code:
+          status_codes: [ERROR]
+
+      # Always sample slow traces (>2s)
+      - name: slow-traces
+        type: latency
+        latency:
+          threshold_ms: 2000
+
+      # Sample business-critical operations at higher rate
+      - name: business-critical
+        type: string_attribute
+        string_attribute:
+          key: business.operation.type
+          values: ["coupon.use", "raffle.draw", "user.login"]
+          invert_match: false
+        sampling_percentage: 50
+
+      # Default probabilistic sampling
+      - name: probabilistic-policy
+        type: probabilistic
+        probabilistic:
+          sampling_percentage: 5
+
+  # Filter processor to drop unwanted spans
+  filter:
+    spans:
+      exclude:
+        match_type: regexp
+        services: ["jaeger.*", "otel.*"]
+        span_names: [".*health.*", ".*metrics.*"]
+
+exporters:
+  # Jaeger exporter
+  jaeger:
+    endpoint: jaeger-collector:14250
+    tls:
+      insecure: true
+
+  # OTLP exporter (for other OTLP-compatible backends)
+  otlp/jaeger:
+    endpoint: jaeger-collector:4317
+    tls:
+      insecure: true
+
+  # Prometheus exporter for metrics
+  prometheus:
+    endpoint: "0.0.0.0:8889"
+    namespace: gasolinera_jsm
+    const_labels:
+      environment: development
+
+  # Logging exporter for debugging
+  logging:
+    loglevel: info
+    sampling_initial: 5
+    sampling_thereafter: 200
+
+  # File exporter for backup/analysis
+  file:
+    path: /tmp/traces.json
+    rotation:
+      max_megabytes: 100
+      max_days: 7
+      max_backups: 3
+
+  # Elasticsearch exporter (alternative)
+  elasticsearch:
+    endpoints: ["http://elasticsearch:9200"]
+    index: otel-traces
+    pipeline: otel-pipeline
+    timeout: 30s
+    retry_on_failure:
+      enabled: true
+      initial_interval: 5s
+      max_interval: 30s
+      max_elapsed_time: 300s
+
+extensions:
+  # Health check extension
+  health_check:
+    endpoint: 0.0.0.0:13133
+
+  # Performance profiler
+  pprof:
+    endpoint: 0.0.0.0:1777
+
+  # Memory ballast for stable memory usage
+  memory_ballast:
+    size_mib: 64
+
+  # Zpages for debugging
+  zpages:
+    endpoint: 0.0.0.0:55679
+
+service:
+  extensions: [health_check, pprof, memory_ballast, zpages]
+
+  pipelines:
+    # Traces pipeline
+    traces:
+      receivers: [otlp, jaeger, zipkin]
+      processors: [
+        memory_limiter,
+        resource,
+        attributes,
+        span,
+        tail_sampling,
+        filter,
+        batch
+      ]
+      exporters: [jaeger, logging]
+
+    # Metrics pipeline
+    metrics:
+      receivers: [otlp, prometheus]
+      processors: [memory_limiter, resource, batch]
+      exporters: [prometheus, logging]
+
+    # Logs pipeline
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, resource, batch]
+      exporters: [logging]
+
+  # Telemetry configuration
+  telemetry:
+    logs:
+      level: "info"
+      development: false
+      sampling:
+        initial: 5
+        thereafter: 200
+
+    metrics:
+      level: "detailed"
+      address: "0.0.0.0:8888"
+
+    traces:
+      level: "basic"

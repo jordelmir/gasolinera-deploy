@@ -1,78 +1,119 @@
-
-
 services:
   postgres:
-    image: postgres:15
+    image: postgres:15-alpine
     container_name: postgres
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-puntog}
-      POSTGRES_USER: ${POSTGRES_USER:-puntog}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
-    ports:
-      - '5432:5432'
+      POSTGRES_DB: ${POSTGRES_DB:-gasolinera_db}
+      POSTGRES_USER: ${POSTGRES_USER:-gasolinera_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-gasolinera_password}
+      POSTGRES_INITDB_ARGS: '--encoding=UTF8 --locale=C'
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          'pg_isready -U ${POSTGRES_USER:-gasolinera_user} -d ${POSTGRES_DB:-gasolinera_db}',
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+    networks:
+      - gasolinera-network
 
   redis:
-    image: redis:7
+    image: redis:7-alpine
     container_name: redis
-    ports:
-      - '6379:6379'
     volumes:
       - redis_data:/data
+      - ./config/redis/redis.conf:/usr/local/etc/redis/redis.conf
+    command: redis-server /usr/local/etc/redis/redis.conf
+    healthcheck:
+      test: ['CMD', 'redis-cli', '--raw', 'incr', 'ping']
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - gasolinera-network
 
   rabbitmq:
-    image: rabbitmq:3.12-management
+    image: rabbitmq:3.12-management-alpine
     container_name: rabbitmq
-    ports:
-      - '5672:5672'
-      - '15672:15672'
     environment:
-      RABBITMQ_DEFAULT_USER: user
-      RABBITMQ_DEFAULT_PASS: password
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USERNAME:-gasolinera_user}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-gasolinera_password}
+      RABBITMQ_DEFAULT_VHOST: ${RABBITMQ_VIRTUAL_HOST:-gasolinera_vhost}
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+      - ./config/rabbitmq/definitions.json:/etc/rabbitmq/definitions.json
+      - ./config/rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf
+    healthcheck:
+      test: ['CMD', 'rabbitmq-diagnostics', 'ping']
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+    networks:
+      - gasolinera-network
 
   jaeger:
-    image: jaegertracing/all-in-one:latest
-    ports:
-      - '16686:16686' # UI
-      - '14268:14268' # API
+    image: jaegertracing/all-in-one:1.52
+    container_name: jaeger
+    environment:
+      COLLECTOR_OTLP_ENABLED: true
+      SPAN_STORAGE_TYPE: memory
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'wget',
+          '--no-verbose',
+          '--tries=1',
+          '--spider',
+          'http://localhost:14269/',
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+    networks:
+      - gasolinera-network
 
   vault:
     image: hashicorp/vault:1.15.4
     container_name: vault
-    ports:
-      - '8200:8200'
-      - '8201:8201'
     environment:
-      VAULT_DEV_ROOT_TOKEN_ID: myroottoken
+      VAULT_DEV_ROOT_TOKEN_ID: ${VAULT_TOKEN:-gasolinera_vault_token_2024}
       VAULT_DEV_LISTEN_ADDRESS: '0.0.0.0:8200'
+      VAULT_ADDR: 'http://0.0.0.0:8200'
     cap_add:
       - IPC_LOCK
-    command: 'server -dev -dev-root-token-id=myroottoken -dev-listen-address=0.0.0.0:8200'
-
-  debezium-connect:
-    image: debezium/connect:2.5
-    ports:
-      - '8083:8083'
-    depends_on:
-      - postgres
-      - rabbitmq
-    environment:
-      BOOTSTRAP_SERVERS: 'kafka:9092' # Placeholder
-      GROUP_ID: 1
-      CONFIG_STORAGE_TOPIC: connect_configs
-      OFFSET_STORAGE_TOPIC: connect_offsets
-      STATUS_STORAGE_TOPIC: connect_statuses
     volumes:
-      - ./ops/debezium:/kafka/connect
+      - vault_data:/vault/data
+      - ./scripts/vault-init.sh:/vault/scripts/vault-init.sh
+    command: 'server -dev -dev-root-token-id=${VAULT_TOKEN:-gasolinera_vault_token_2024} -dev-listen-address=0.0.0.0:8200'
+    healthcheck:
+      test: ['CMD', 'vault', 'status']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+    networks:
+      - gasolinera-network
 
   api-gateway:
     build:
       context: .
       dockerfile: services/api-gateway/Dockerfile
     container_name: api-gateway
-    ports:
-      - '8080:8080'
     depends_on:
       auth-service:
         condition: service_healthy
@@ -82,61 +123,89 @@ services:
         condition: service_healthy
       ad-engine:
         condition: service_healthy
-      # raffle-service:
-      #   condition: service_healthy
+      coupon-service:
+        condition: service_healthy
+      raffle-service:
+        condition: service_healthy
       jaeger:
-        condition: service_started
+        condition: service_healthy
       vault:
         condition: service_healthy
     environment:
       - SPRING_PROFILES_ACTIVE=docker
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
-      - VAULT_TOKEN=myroottoken
-      - JAVA_OPTS=-Xmx512m -Xms256m
+      - VAULT_TOKEN=${VAULT_TOKEN:-gasolinera_vault_token_2024}
+      - VAULT_ADDR=http://vault:8200
+      - JAVA_OPTS=-Xmx1024m -Xms512m
     healthcheck:
       test: ['CMD', 'curl', '-f', 'http://localhost:8080/actuator/health']
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 40s
-    command: >
-      sh -c "
-        sleep 10 && # Wait for Vault to be ready
-        vault login myroottoken &&
-        vault kv put secret/application jwt_secret=supersecretkey jwt_refresh_secret=supersecretrefreshkey qr_signature_secret=qrsignaturesecret fallback_ad_url=http://example.com/fallback.mp4 postgres_user=puntog postgres_password=changeme postgres_db=puntog redis_host=redis rabbitmq_host=rabbitmq &&
-        java $JAVA_OPTS -jar /app/app.jar
-      "
+      start_period: 90s
+    restart: unless-stopped
+    networks:
+      - gasolinera-network
 
   auth-service:
     build:
       context: .
       dockerfile: services/auth-service/Dockerfile
     container_name: auth-service
-    ports:
-      - '8081:8080'
     depends_on:
-      - postgres
-      - redis
-      - jaeger
-      - vault
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      jaeger:
+        condition: service_healthy
+      vault:
+        condition: service_healthy
     environment:
-      - VAULT_TOKEN=myroottoken
+      - SPRING_PROFILES_ACTIVE=docker
+      - VAULT_TOKEN=${VAULT_TOKEN:-gasolinera_vault_token_2024}
+      - VAULT_ADDR=http://vault:8200
+      - JAVA_OPTS=-Xmx512m -Xms256m
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:8080/actuator/health']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
+    networks:
+      - gasolinera-network
 
   redemption-service:
     build:
       context: .
       dockerfile: services/redemption-service/Dockerfile
     container_name: redemption-service
-    ports:
-      - '8082:8080'
     depends_on:
-      - postgres
-      - redis
-      - rabbitmq
-      - jaeger
-      - vault
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      jaeger:
+        condition: service_healthy
+      vault:
+        condition: service_healthy
     environment:
-      - VAULT_TOKEN=myroottoken
+      - SPRING_PROFILES_ACTIVE=docker
+      - VAULT_TOKEN=${VAULT_TOKEN:-gasolinera_vault_token_2024}
+      - VAULT_ADDR=http://vault:8200
+      - JAVA_OPTS=-Xmx512m -Xms256m
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:8080/actuator/health']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
+    networks:
+      - gasolinera-network
 
   station-service:
     build:
@@ -144,63 +213,125 @@ services:
       dockerfile: services/station-service/Dockerfile
     container_name: station-service
     depends_on:
-      - postgres
-      - jaeger
-      - vault
+      postgres:
+        condition: service_healthy
+      jaeger:
+        condition: service_healthy
+      vault:
+        condition: service_healthy
     environment:
-      - VAULT_TOKEN=myroottoken
-
-  ad-engine:
-    build:
-      context: .
-      dockerfile: services/ad-engine/Dockerfile
-    container_name: ad-engine
-    ports:
-      - '8084:8080'
-    depends_on:
-      - postgres
-      - jaeger
-      - vault
-    environment:
-      - VAULT_TOKEN=myroottoken
-
-  # raffle-service:
-  #   build:
-  #     context: .
-  #     dockerfile: services/raffle-service/Dockerfile
-  #   container_name: raffle-service
-  #   ports:
-  #     - '8085:8080'
-  #   depends_on:
-  #     - postgres
-  #     - jaeger
-  #     - vault
-  #   environment:
-  #     - VAULT_TOKEN=myroottoken
-
-  coupon-service:
-    build:
-      context: .
-      dockerfile: services/coupon-service/Dockerfile
-    container_name: coupon-service
-    ports:
-      - '8086:8080'
-    depends_on:
-      - postgres
-      - redis
-      - rabbitmq
-      - jaeger
-      - vault
-    environment:
-      - VAULT_TOKEN=myroottoken
+      - SPRING_PROFILES_ACTIVE=docker
+      - VAULT_TOKEN=${VAULT_TOKEN:-gasolinera_vault_token_2024}
+      - VAULT_ADDR=http://vault:8200
       - JAVA_OPTS=-Xmx512m -Xms256m
     healthcheck:
       test: ['CMD', 'curl', '-f', 'http://localhost:8080/actuator/health']
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 40s
+      start_period: 60s
+    restart: unless-stopped
+    networks:
+      - gasolinera-network
+
+  ad-engine:
+    build:
+      context: .
+      dockerfile: services/ad-engine/Dockerfile
+    container_name: ad-engine
+    depends_on:
+      postgres:
+        condition: service_healthy
+      jaeger:
+        condition: service_healthy
+      vault:
+        condition: service_healthy
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - VAULT_TOKEN=${VAULT_TOKEN:-gasolinera_vault_token_2024}
+      - VAULT_ADDR=http://vault:8200
+      - JAVA_OPTS=-Xmx512m -Xms256m
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:8080/actuator/health']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
+    networks:
+      - gasolinera-network
+
+  raffle-service:
+    build:
+      context: .
+      dockerfile: services/raffle-service/Dockerfile
+    container_name: raffle-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      jaeger:
+        condition: service_healthy
+      vault:
+        condition: service_healthy
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - VAULT_TOKEN=${VAULT_TOKEN:-gasolinera_vault_token_2024}
+      - VAULT_ADDR=http://vault:8200
+      - JAVA_OPTS=-Xmx512m -Xms256m
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:8080/actuator/health']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
+    networks:
+      - gasolinera-network
+
+  coupon-service:
+    build:
+      context: .
+      dockerfile: services/coupon-service/Dockerfile
+    container_name: coupon-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      jaeger:
+        condition: service_healthy
+      vault:
+        condition: service_healthy
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - VAULT_TOKEN=${VAULT_TOKEN:-gasolinera_vault_token_2024}
+      - VAULT_ADDR=http://vault:8200
+      - JAVA_OPTS=-Xmx512m -Xms256m
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:8080/actuator/health']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
+    networks:
+      - gasolinera-network
 
 volumes:
   postgres_data:
   redis_data:
+  rabbitmq_data:
+  vault_data:
+
+networks:
+  gasolinera-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

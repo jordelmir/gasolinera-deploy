@@ -1,0 +1,235 @@
+# Configuración del sistema de caching con Redis
+gasolinera:
+  cache:
+    enabled: true
+    default-ttl: PT30M  # 30 minutos
+    key-prefix: "gasolinera"
+
+    # Configuración de clustering Redis
+    clustering:
+      enabled: false
+      nodes: []
+      master-name: "mymaster"
+      password: ""
+      database: 0
+      connection-pool-size: 10
+      connection-minimum-idle-size: 5
+      timeout: PT3S
+      retry-attempts: 3
+      retry-interval: PT1.5S
+
+    # Configuración de warmup
+    warmup:
+      enabled: true
+      on-startup: true
+      scheduled: true
+      schedule-cron: "0 0 6 * * ?"  # 6 AM diariamente
+      batch-size: 100
+      parallelism: 4
+      timeout: PT10M
+
+    # Configuración de invalidación
+    invalidation:
+      enabled: true
+      cascade-invalidation: true
+      async-invalidation: true
+      batch-size: 50
+
+    # Configuración de monitoreo
+    monitoring:
+      enabled: true
+      metrics-enabled: true
+      health-check-enabled: true
+      slow-operation-threshold: PT100MS
+      alert-on-high-miss-rate: true
+      miss-rate-threshold: 0.8
+
+# Configuración de Spring Data Redis
+spring:
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      database: ${REDIS_DATABASE:0}
+      timeout: PT3S
+
+      # Configuración de Lettuce (cliente por defecto)
+      lettuce:
+        pool:
+          max-active: 20
+          max-idle: 10
+          min-idle: 5
+          max-wait: PT3S
+        shutdown-timeout: PT100MS
+
+      # Configuración de clustering (si está habilitado)
+      cluster:
+        nodes: ${REDIS_CLUSTER_NODES:}
+        max-redirects: 3
+
+      # Configuración de Sentinel (si está habilitado)
+      sentinel:
+        master: ${REDIS_SENTINEL_MASTER:mymaster}
+        nodes: ${REDIS_SENTINEL_NODES:}
+        password: ${REDIS_SENTINEL_PASSWORD:}
+
+  # Configuración de cache de Spring
+  cache:
+    type: redis
+    redis:
+      time-to-live: PT30M
+      cache-null-values: false
+      key-prefix: "gasolinera:"
+      use-key-prefix: true
+
+# Configuración de métricas Micrometer
+management:
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+    tags:
+      application: ${spring.application.name:gasolinera}
+      environment: ${ENVIRONMENT:development}
+
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics,prometheus,cache
+
+  endpoint:
+    health:
+      show-details: always
+      show-components: always
+    cache:
+      enabled: true
+
+# Configuración de logging específica para cache
+logging:
+  level:
+    com.gasolinerajsm.shared.cache: DEBUG
+    org.springframework.cache: INFO
+    org.springframework.data.redis: INFO
+    io.lettuce.core: WARN
+
+---
+# Configuración para ambiente de desarrollo
+spring:
+  config:
+    activate:
+      on-profile: development
+
+gasolinera:
+  cache:
+    warmup:
+      on-startup: false  # Deshabilitado en desarrollo
+      scheduled: false
+    monitoring:
+      slow-operation-threshold: PT500MS  # Más permisivo en desarrollo
+
+spring:
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      password: ""
+
+---
+# Configuración para ambiente de testing
+spring:
+  config:
+    activate:
+      on-profile: test
+
+gasolinera:
+  cache:
+    enabled: false  # Cache deshabilitado en tests por defecto
+    warmup:
+      enabled: false
+    invalidation:
+      enabled: false
+    monitoring:
+      enabled: false
+
+---
+# Configuración para ambiente de producción
+spring:
+  config:
+    activate:
+      on-profile: production
+
+gasolinera:
+  cache:
+    clustering:
+      enabled: ${REDIS_CLUSTER_ENABLED:false}
+      nodes: ${REDIS_CLUSTER_NODES:}
+
+    warmup:
+      on-startup: true
+      scheduled: true
+      parallelism: 8  # Más paralelismo en producción
+
+    invalidation:
+      async-invalidation: true
+      batch-size: 100  # Batches más grandes en producción
+
+    monitoring:
+      alert-on-high-miss-rate: true
+      miss-rate-threshold: 0.7  # Más estricto en producción
+
+spring:
+  data:
+    redis:
+      host: ${REDIS_HOST}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD}
+      database: ${REDIS_DATABASE:0}
+
+      lettuce:
+        pool:
+          max-active: 50  # Pool más grande en producción
+          max-idle: 20
+          min-idle: 10
+
+      cluster:
+        nodes: ${REDIS_CLUSTER_NODES:}
+        max-redirects: 5
+
+      sentinel:
+        master: ${REDIS_SENTINEL_MASTER:mymaster}
+        nodes: ${REDIS_SENTINEL_NODES:}
+
+# Configuración de logging para producción
+logging:
+  level:
+    com.gasolinerajsm.shared.cache: INFO
+    org.springframework.cache: WARN
+    org.springframework.data.redis: WARN
+
+---
+# Configuración para ambiente de staging
+spring:
+  config:
+    activate:
+      on-profile: staging
+
+gasolinera:
+  cache:
+    warmup:
+      parallelism: 6
+
+    invalidation:
+      batch-size: 75
+
+    monitoring:
+      miss-rate-threshold: 0.75
+
+spring:
+  data:
+    redis:
+      lettuce:
+        pool:
+          max-active: 30
+          max-idle: 15
+          min-idle: 8

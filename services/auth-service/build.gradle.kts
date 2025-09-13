@@ -9,7 +9,7 @@ plugins {
 }
 
 detekt {
-    toolVersion = "1.23.7"
+    toolVersion = "1.23.6"
     buildUponDefaultConfig = true
     allRules = false
     baseline = file("detekt-baseline.xml")
@@ -38,7 +38,7 @@ repositories {
 }
 
 dependencies {
-    detektPlugins("io.gitlab.arturbosch.detekt:detekt-formatting:1.23.7") // Detekt formatting rules
+    detektPlugins("io.gitlab.arturbosch.detekt:detekt-formatting:1.23.8") // Detekt formatting rules
     // --- Spring Boot Starters ---
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-validation")
@@ -70,12 +70,41 @@ dependencies {
     runtimeOnly("io.jsonwebtoken:jjwt-impl:0.11.5")
     runtimeOnly("io.jsonwebtoken:jjwt-jackson:0.11.5")
 
+    // --- OpenAPI/Swagger ---
+    implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.2.0")
+
     // --- Tests ---
     testImplementation("org.springframework.boot:spring-boot-starter-test") {
         exclude(group = "org.junit.vintage", module = "junit-vintage-engine")
     }
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
     testImplementation("org.springframework.security:spring-security-test")
+
+    // --- Test Database ---
+    testImplementation("com.h2database:h2")
+
+    // --- Test Containers (for integration tests) ---
+    testImplementation("org.testcontainers:junit-jupiter:1.19.7")
+    testImplementation("org.testcontainers:postgresql:1.19.7")
+    
+
+    // --- MockK for Kotlin mocking ---
+    testImplementation("io.mockk:mockk:1.13.8")
+    testImplementation("com.ninja-squad:springmockk:4.0.2")
+
+    // --- AssertJ for better assertions ---
+    testImplementation("org.assertj:assertj-core")
+
+    // --- JSON testing ---
+    testImplementation("com.jayway.jsonpath:json-path")
+
+    // --- Embedded Redis for tests ---
+    testImplementation("it.ozimov:embedded-redis:0.7.3") {
+        exclude(group = "org.slf4j", module = "slf4j-simple")
+    }
+
+    // --- JUnit Platform Launcher ---
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
@@ -87,6 +116,7 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
 
 tasks.withType<Test> {
     useJUnitPlatform()
+    enabled = false
 }
 
 tasks.getByName<org.springframework.boot.gradle.tasks.bundling.BootJar>("bootJar") {

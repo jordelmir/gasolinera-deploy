@@ -1,0 +1,304 @@
+# RabbitMQ Configuration for Gasolinera JSM Platform
+# This file defines the message routing topology for all services
+
+# Exchanges Configuration
+exchanges:
+  # Main business events exchange
+  - name: gasolinera.events
+    type: topic
+    durable: true
+    auto_delete: false
+    arguments:
+      alternate-exchange: gasolinera.dlx
+
+  # Dead Letter Exchange for failed messages
+  - name: gasolinera.dlx
+    type: direct
+    durable: true
+    auto_delete: false
+
+  # Redemption Service Exchange
+  - name: redemption.exchange
+    type: topic
+    durable: true
+    auto_delete: false
+    arguments:
+      alternate-exchange: gasolinera.dlx
+
+  # Ad Engine Exchange
+  - name: ad.exchange
+    type: topic
+    durable: true
+    auto_delete: false
+    arguments:
+      alternate-exchange: gasolinera.dlx
+
+  # Raffle Service Exchange
+  - name: raffle.exchange
+    type: topic
+    durable: true
+    auto_delete: false
+    arguments:
+      alternate-exchange: gasolinera.dlx
+
+  # Coupon Service Exchange
+  - name: coupon.exchange
+    type: topic
+    durable: true
+    auto_delete: false
+    arguments:
+      alternate-exchange: gasolinera.dlx
+
+  # Audit Exchange for logging and monitoring
+  - name: audit.exchange
+    type: topic
+    durable: true
+    auto_delete: false
+
+# Queues Configuration
+queues:
+  # Dead Letter Queue
+  - name: gasolinera.dlq
+    durable: true
+    auto_delete: false
+    arguments:
+      x-message-ttl: 86400000  # 24 hours
+      x-max-length: 10000
+
+  # Redemption Service Queues
+  - name: redemption.created.queue
+    durable: true
+    auto_delete: false
+    arguments:
+      x-dead-letter-exchange: gasolinera.dlx
+      x-dead-letter-routing-key: redemption.created.failed
+      x-message-ttl: 3600000  # 1 hour
+      x-max-retries: 3
+
+  - name: redemption.completed.queue
+    durable: true
+    auto_delete: false
+    arguments:
+      x-dead-letter-exchange: gasolinera.dlx
+      x-dead-letter-routing-key: redemption.completed.failed
+      x-message-ttl: 3600000
+      x-max-retries: 3
+
+  - name: redemption.voided.queue
+    durable: true
+    auto_delete: false
+    arguments:
+      x-dead-letter-exchange: gasolinera.dlx
+      x-dead-letter-routing-key: redemption.voided.failed
+      x-message-ttl: 3600000
+      x-max-retries: 3
+
+  # Raffle Service Queues
+  - name: raffle.tickets.generated.queue
+    durable: true
+    auto_delete: false
+    arguments:
+      x-dead-letter-exchange: gasolinera.dlx
+      x-dead-letter-routing-key: raffle.tickets.generated.failed
+      x-message-ttl: 3600000
+      x-max-retries: 3
+
+  - name: raffle.entry.created.queue
+    durable: true
+    auto_delete: false
+    arguments:
+      x-dead-letter-exchange: gasolinera.dlx
+      x-dead-letter-routing-key: raffle.entry.created.failed
+      x-message-ttl: 3600000
+      x-max-retries: 3
+
+  - name: raffle.winner.selected.queue
+    durable: true
+    auto_delete: false
+    arguments:
+      x-dead-letter-exchange: gasolinera.dlx
+      x-dead-letter-routing-key: raffle.winner.selected.failed
+      x-message-ttl: 3600000
+      x-max-retries: 3
+
+  # Ad Engine Queues
+  - name: ad.engagement.completed.queue
+    durable: true
+    auto_delete: false
+    arguments:
+      x-dead-letter-exchange: gasolinera.dlx
+      x-dead-letter-routing-key: ad.engagement.completed.failed
+      x-message-ttl: 3600000
+      x-max-retries: 3
+
+  - name: ad.tickets.multiplied.queue
+    durable: true
+    auto_delete: false
+    arguments:
+      x-dead-letter-exchange: gasolinera.dlx
+      x-dead-letter-routing-key: ad.tickets.multiplied.failed
+      x-message-ttl: 3600000
+      x-max-retries: 3
+
+  # Coupon Service Queues
+  - name: coupon.validated.queue
+    durable: true
+    auto_delete: false
+    arguments:
+      x-dead-letter-exchange: gasolinera.dlx
+      x-dead-letter-routing-key: coupon.validated.failed
+      x-message-ttl: 3600000
+      x-max-retries: 3
+
+  - name: coupon.redeemed.queue
+    durable: true
+    auto_delete: false
+    arguments:
+      x-dead-letter-exchange: gasolinera.dlx
+      x-dead-letter-routing-key: coupon.redeemed.failed
+      x-message-ttl: 3600000
+      x-max-retries: 3
+
+  # Audit Queues
+  - name: audit.events.queue
+    durable: true
+    auto_delete: false
+    arguments:
+      x-message-ttl: 604800000  # 7 days
+      x-max-length: 100000
+
+  - name: audit.security.queue
+    durable: true
+    auto_delete: false
+    arguments:
+      x-message-ttl: 2592000000  # 30 days
+      x-max-length: 50000
+
+# Bindings Configuration
+bindings:
+  # Redemption Service Bindings
+  - exchange: redemption.exchange
+    queue: redemption.created.queue
+    routing_key: redemption.created
+
+  - exchange: redemption.exchange
+    queue: redemption.completed.queue
+    routing_key: redemption.completed
+
+  - exchange: redemption.exchange
+    queue: redemption.voided.queue
+    routing_key: redemption.voided
+
+  # Cross-service bindings for raffle tickets
+  - exchange: redemption.exchange
+    queue: raffle.tickets.generated.queue
+    routing_key: raffle.tickets.generated
+
+  # Ad Engine Bindings
+  - exchange: ad.exchange
+    queue: ad.engagement.completed.queue
+    routing_key: ad.engagement.completed
+
+  - exchange: ad.exchange
+    queue: ad.tickets.multiplied.queue
+    routing_key: ad.tickets.multiplied
+
+  # Cross-service binding for ticket multiplication
+  - exchange: ad.exchange
+    queue: raffle.tickets.generated.queue
+    routing_key: raffle.tickets.generated
+
+  # Raffle Service Bindings
+  - exchange: raffle.exchange
+    queue: raffle.entry.created.queue
+    routing_key: raffle.entry.created
+
+  - exchange: raffle.exchange
+    queue: raffle.winner.selected.queue
+    routing_key: raffle.winner.selected
+
+  # Coupon Service Bindings
+  - exchange: coupon.exchange
+    queue: coupon.validated.queue
+    routing_key: coupon.validated
+
+  - exchange: coupon.exchange
+    queue: coupon.redeemed.queue
+    routing_key: coupon.redeemed
+
+  # Audit Bindings
+  - exchange: audit.exchange
+    queue: audit.events.queue
+    routing_key: audit.#
+
+  - exchange: audit.exchange
+    queue: audit.security.queue
+    routing_key: audit.security.#
+
+  # Dead Letter Bindings
+  - exchange: gasolinera.dlx
+    queue: gasolinera.dlq
+    routing_key: "#"
+
+# Routing Keys Pattern
+routing_keys:
+  redemption:
+    - redemption.created
+    - redemption.completed
+    - redemption.voided
+    - redemption.expired
+    - redemption.failed
+
+  raffle:
+    - raffle.tickets.generated
+    - raffle.entry.created
+    - raffle.draw.executed
+    - raffle.winner.selected
+    - raffle.prize.awarded
+
+  ad_engine:
+    - ad.engagement.started
+    - ad.engagement.completed
+    - ad.tickets.multiplied
+    - ad.campaign.updated
+
+  coupon:
+    - coupon.created
+    - coupon.validated
+    - coupon.redeemed
+    - coupon.expired
+
+  audit:
+    - audit.user.action
+    - audit.security.violation
+    - audit.system.event
+    - audit.transaction.completed
+
+# Message TTL and Retry Configuration
+message_config:
+  default_ttl: 3600000  # 1 hour
+  max_retries: 3
+  retry_delay: 5000     # 5 seconds
+  dead_letter_ttl: 86400000  # 24 hours
+
+# Consumer Configuration
+consumers:
+  redemption_service:
+    prefetch_count: 10
+    concurrent_consumers: 3
+    max_concurrent_consumers: 10
+
+  raffle_service:
+    prefetch_count: 5
+    concurrent_consumers: 2
+    max_concurrent_consumers: 8
+
+  ad_engine:
+    prefetch_count: 15
+    concurrent_consumers: 5
+    max_concurrent_consumers: 15
+
+  coupon_service:
+    prefetch_count: 10
+    concurrent_consumers: 3
+    max_concurrent_consumers: 10

@@ -1,368 +1,725 @@
-# 🎮 Gasolinera JSM - Sistema de Cupones Digitales Gamificado
+# 🚀 Gasolinera JSM - Sistema de Cupones y Rifas
 
-Una plataforma revolucionaria que transforma los cupones físicos tradicionales en una experiencia digital gamificada con sorteos semanales y anuales.
+[![Build Status](https://github.com/gasolinera-jsm/gasolinera-jsm-ultimate/workflows/CI/badge.svg)](https://github.com/gasolinera-jsm/gasolinera-jsm-ultimate/actions)
+[![Coverage](https://codecov.io/gh/gasolinera-jsm/gasolinera-jsm-ultimate/branch/main/graph/badge.svg)](https://codecov.io/gh/gasolinera-jsm/gasolinera-jsm-ultimate)
+[![License](https://img.shields.io/badge/license-Proprietary-red.svg)](LICENSE)
+[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://github.com/gasolinera-jsm/gasolinera-jsm-ultimate/releases)
 
-## 🎯 Propósito
+## 📋 Descripción
 
-Digitalizar completamente el sistema de cupones de gasolineras, reemplazando los cupones físicos por códigos QR únicos que los clientes pueden escanear para participar en sorteos. Cada ₡5,000 de compra = 1 ticket para sorteos semanales de ₡40,000 y sorteo anual de un carro.
+**Gasolinera JSM** es un sistema integral de gestión de cupones de combustible y rifas desarrollado con arquitectura de microservicios. Permite a los usuarios comprar cupones digitales, canjearlos en estaciones de servicio, y participar automáticamente en rifas emocionantes. El sistema incluye funcionalidades avanzadas como búsqueda geoespacial de estaciones, procesamiento de pagos múltiples, códigos QR seguros, y analytics en tiempo real.
 
-## ✨ Características Principales
+## 🌟 Características Principales
 
-### 👤 Para Clientes
+### 🎫 Sistema de Cupones Digitales
 
-- **Dashboard Personal**: Visualiza tus tickets acumulados
-- **Escáner QR**: Escanea códigos del dispensador
-- **Sistema de Anuncios Gamificado**: Ve anuncios para duplicar tickets (10s → 15s → 30s → 1m → hasta 10m)
-- **Tokens Únicos**: Cada cupón genera un token único para sorteos
-- **Celebración de Ganadores**: Pantallas especiales para ganadores
+- **Compra Segura** con múltiples métodos de pago (Stripe, PayPal, SPEI)
+- **Códigos QR Criptográficos** únicos e imposibles de falsificar
+- **Canje en Tiempo Real** en estaciones de servicio
+- **Gestión Completa** (cancelación, reembolsos, regeneración de QR)
+- **Validación Anti-fraude** con machine learning
 
-### ⛽ Para Empleados/Dispensadores
+### ⛽ Red de Estaciones Inteligente
 
-- **Interfaz Ultra-Simple**: Contador +/- para múltiplos de ₡5,000
-- **Generador QR**: Botón que genera códigos únicos por transacción
-- **Reset Automático**: Listo para el siguiente cliente
+- **Búsqueda Geoespacial** con radio personalizable
+- **Precios en Tiempo Real** actualizados cada 15 minutos
+- **Filtros Avanzados** por combustible, servicios, rating
+- **Información Detallada** de disponibilidad y horarios
+- **Analytics de Rendimiento** para operadores
 
-### 🏢 Para Dueños/Administradores
+### 🎰 Sistema de Rifas Automático
 
-- **Dashboard Ejecutivo**: Métricas avanzadas y KPIs
-- **Gestión de Estaciones**: Administra múltiples gasolineras
-- **Gestión de Empleados**: Registra y asigna personal
-- **Analytics Detallados**: Rendimiento por empleado y sucursal
-- **Control de Sorteos**: Gestión de premios y ganadores
+- **Generación Automática** de tickets al canjear cupones
+- **Multiplicadores Dinámicos** por tipo de combustible
+- **Bonificaciones** por engagement con publicidad
+- **Sorteos Transparentes** con algoritmos verificables
+- **Premios Atractivos** y notificaciones automáticas
 
-## Arquitectura y Stack Tecnológico
+### 🔐 Seguridad y Autenticación
 
-El sistema está construido sobre una arquitectura de microservicios utilizando un monorepo `nx`.
+- **JWT Authentication** con refresh tokens
+- **Role-Based Access Control** (RBAC)
+- **Rate Limiting** inteligente por usuario
+- **Audit Trail** completo de transacciones
+- **Encriptación End-to-End** de datos sensibles
 
-- **Backend:** Kotlin + Spring Boot 3 + Java 17
-- **Frontend (Web):** Next.js + TypeScript + Tailwind CSS
-- **Móvil:** React Native (Expo) + TypeScript
-- **Base de Datos:** PostgreSQL
-- **Cache/Locks:** Redis
-- **Mensajería:** RabbitMQ (con soporte para Kafka a través de Debezium)
-- **Observabilidad:** OpenTelemetry y Jaeger para tracing distribuido.
-- **Patrones de Diseño:** Patrón Outbox con Debezium para garantizar la entrega de mensajes.
-- **API y SDK:** OpenAPI para la definición de APIs y generación de un SDK interno para la comunicación entre servicios.
-- **Infraestructura:** Docker, Kubernetes (Helm), Terraform
-- **CI/CD:** GitHub Actions
+### 📊 Observabilidad y Monitoreo
 
-## 🚀 Quick Start
+- **Métricas en Tiempo Real** con Prometheus
+- **Distributed Tracing** con Jaeger
+- **Logging Estructurado** con correlation IDs
+- **Dashboards Interactivos** con Grafana
+- **Alertas Inteligentes** para operaciones
 
-### Requisitos Previos
-
-- **Docker Desktop** - Para containerización
-- **Node.js 18+** - Para aplicaciones frontend
-- **JDK 17** - Para servicios backend
-- **Git** - Control de versiones
-
-### Setup en 3 Pasos
-
-```bash
-# 1. Clonar y configurar
-git clone https://github.com/jordelmir/gasolinera-jsm-ultimate.git
-cd gasolinera-jsm-ultimate
-cp .env.example .env
-
-# 2. Instalar dependencias
-npm install
-
-# 3. Levantar el entorno completo
-make dev
-```
-
-### Verificación
-
-```bash
-# Ver logs de todos los servicios
-make logs
-
-# Verificar que todo esté funcionando
-curl http://localhost:8080/actuator/health
-```
-
-### Desarrollo Frontend Únicamente
-
-Si solo quieres trabajar en el frontend:
-
-```bash
-make dev-frontend
-```
-
-## Servicios y URLs Locales
-
-Una vez que `make dev` se complete, los siguientes servicios estarán disponibles:
-
-- **API Gateway:** [http://localhost:8080](http://localhost:8080)
-- **Admin Dashboard:** [http://localhost:3000](http://localhost:3000)
-- **Advertiser Portal:** [http://localhost:3001](http://localhost:3001)
-- **PostgreSQL:** `localhost:5432`
-- **Redis:** `localhost:6379`
-- **RabbitMQ Management:** [http://localhost:15672](http://localhost:15672)
-- **Jaeger UI (Tracing):** [http://localhost:16686](http://localhost:16686)
-
-## Scripts Útiles
-
-- `make build-all`: Construye las imágenes Docker de todos los servicios.
-- `make dev`: Inicia todo el entorno de desarrollo con Docker Compose.
-- `make stop`: Detiene todos los contenedores.
-- `make clean`: Detiene y elimina todos los contenedores, volúmenes y redes.
-- `make logs`: Muestra los logs de todos los servicios.
-- `make test`: Ejecuta tests unitarios e de integración en todos los servicios.
-- `make seed`: Ejecuta el script de seeding para poblar la base de datos con datos de prueba.
-- `make mobile`: Inicia el servidor de desarrollo de la app móvil (Expo).
-- `make k8s-up`: Despliega la aplicación en un clúster de Kubernetes local.
-- `make k8s-down`: Elimina el despliegue de Kubernetes.
-
-## FAQ
-
-**¿Cómo genero nuevos códigos QR firmados?**
-Usa el script de `ops`. Requiere que el entorno esté corriendo para acceder a los secretos.
-
-```bash
-npm run nx -- run ops:qr:generate --count 10
-```
-
-**¿Dónde están las credenciales de prueba?**
-Revisa el script de seeding `ops/scripts/dev/seed.ts` para ver los usuarios y estaciones de prueba que se crean.
-
-## 📊 Métricas y Monitoreo
-
-Una vez que el sistema esté ejecutándose, puedes acceder a:
-
-- **Jaeger Tracing**: [http://localhost:16686](http://localhost:16686) - Trazabilidad distribuida
-- **RabbitMQ Management**: [http://localhost:15672](http://localhost:15672) - Gestión de colas
-- **Health Checks**: `http://localhost:8080/actuator/health` - Estado de servicios
-
-## 🤝 Contribuir
-
-¡Las contribuciones son bienvenidas! Por favor lee nuestra [Guía de Contribución](CONTRIBUTING.md) para conocer el proceso.
-
-### Desarrollo Local
-
-1. Fork el repositorio
-2. Crea una rama feature (`git checkout -b feature/amazing-feature`)
-3. Commit tus cambios (`git commit -m 'feat: add amazing feature'`)
-4. Push a la rama (`git push origin feature/amazing-feature`)
-5. Abre un Pull Request
-
-## 📚 Documentación Adicional
-
-- [Arquitectura del Sistema](docs/ARCHITECTURE.md)
-- [Guía de Contribución](CONTRIBUTING.md)
-- [API Documentation](docs/API.md)
-
-## 📝 Licencia
-
-Este proyecto está bajo la Licencia MIT - ver el archivo [LICENSE](LICENSE) para detalles.
-
-## 🆘 Soporte
-
-Si encuentras algún problema o tienes preguntas:
-
-- Crea un [issue](https://github.com/jordelmir/gasolinera-jsm-ultimate/issues)
-- Revisa la documentación en `/docs`
-- Contacta al equipo de desarrollo
-
-## 🌐 Servicios y URLs Locales
-
-Una vez que `make dev` se complete, los siguientes servicios estarán disponibles:
-
-### Backend Services
-
-- **API Gateway:** [http://localhost:8080](http://localhost:8080)
-- **Auth Service:** `localhost:8081`
-- **Coupon Service:** `localhost:8086`
-- **Station Service:** `localhost:8083`
-- **Ad Engine:** `localhost:8084`
-- **Raffle Service:** `localhost:8085`
-- **Redemption Service:** `localhost:8082`
-
-### Frontend Applications
-
-- **Owner Dashboard:** [http://localhost:3002](http://localhost:3002)
-- **Admin Panel:** [http://localhost:3000](http://localhost:3000)
-- **Advertiser Portal:** [http://localhost:3001](http://localhost:3001)
-
-### Infrastructure
-
-- **PostgreSQL:** `localhost:5432`
-- **Redis:** `localhost:6379`
-- **RabbitMQ Management:** [http://localhost:15672](http://localhost:15672) (user/password)
-- **Jaeger Tracing:** [http://localhost:16686](http://localhost:16686)
-- **Vault:** [http://localhost:8200](http://localhost:8200) (token: myroottoken)
-
-### Mobile Apps
-
-- **Cliente Mobile:** `expo start` en `apps/client-mobile/`
-- **Empleado Mobile:** `expo start` en `apps/employee-mobile/`
-
-## 🎮 Cómo Funciona el Sistema
-
-### Para Clientes
-
-1. **Descargar la app móvil** de cliente
-2. **Registrarse** con email y teléfono
-3. **Escanear QR** generado por el empleado en la gasolinera
-4. **Activar cupón** y ver anuncios para duplicar tickets
-5. **Participar automáticamente** en sorteos semanales y anuales
-
-### Para Empleados
-
-1. **Usar la app móvil** de empleado
-2. **Seleccionar monto** de la compra (múltiplos de ₡5,000)
-3. **Generar QR** único para el cliente
-4. **Mostrar QR** al cliente para escanear
-
-### Para Dueños
-
-1. **Acceder al dashboard web** de administración
-2. **Gestionar estaciones** y empleados
-3. **Ver analytics** y métricas de rendimiento
-4. **Configurar sorteos** y premios
-
-## 🎯 Flujo de Cupones Digitales
-
-```
-Cliente compra ₡15,000 → Empleado genera QR (3 tickets base)
-↓
-Cliente escanea QR → Activa cupón
-↓
-Ve anuncio de 10s → Duplica tickets (6 total)
-↓
-Ve anuncio de 15s → Duplica tickets (12 total)
-↓
-Continúa hasta 10 anuncios máximo → Máximo 3,072 tickets
-↓
-Participa automáticamente en sorteos
-```
-
-## 🏆 Sistema de Sorteos
-
-- **Sorteo Semanal:** ₡40,000 cada domingo
-- **Sorteo Anual:** Un carro en diciembre
-- **Algoritmo:** Completamente aleatorio y transparente
-- **Elegibilidad:** Todos los tickets activos participan
-
-## 🚀 Deployment en Producción
-
-### Usando el script automatizado:
-
-```bash
-# Staging
-./scripts/deploy.sh staging
-
-# Producción
-./scripts/deploy.sh production
-```
-
-### Manual:
-
-```bash
-# Configurar variables de entorno
-cp .env.production .env
-
-# Deploy con Docker Compose
-make deploy-production
-
-# Verificar deployment
-curl https://api.gasolinera-jsm.com/actuator/health
-```
-
-## 🔧 Comandos de Desarrollo
-
-### Desarrollo Completo
-
-```bash
-make dev                    # Todo el sistema
-make dev-mobile            # Solo apps móviles
-make dev-web               # Solo apps web
-```
-
-### Apps Individuales
-
-```bash
-make client-mobile         # App cliente
-make employee-mobile       # App empleado
-make owner-dashboard       # Dashboard dueño
-```
-
-### Base de Datos
-
-```bash
-make seed-coupon-system    # Datos de prueba
-make db-backup            # Backup
-make db-restore           # Restaurar
-```
-
-## 🔐 Credenciales de Prueba
-
-Después de ejecutar `make seed-coupon-system`:
-
-- **Cliente:** `cliente@test.com` / `password123`
-- **Empleado:** `empleado@test.com` / `password123`
-- **Dueño:** `dueno@test.com` / `password123`
-- **Anunciante:** `anunciante@test.com` / `password123`
-
-## 🏗️ Arquitectura Técnica
+## 🏗️ Arquitectura del Sistema
 
 ### Microservicios
 
-- **Coupon Service:** Gestión de QR y cupones
-- **Auth Service:** Autenticación y autorización
-- **Station Service:** Gestión de estaciones
-- **Ad Engine:** Motor de anuncios y secuencias
-- **Raffle Service:** Sistema de sorteos
-- **Redemption Service:** Canjes y recompensas
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   API Gateway   │────│  Auth Service   │────│  User Service   │
+│   (Port 8080)   │    │   (Port 8081)   │    │   (Port 8082)   │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+         │                       │                       │
+         ├───────────────────────┼───────────────────────┤
+         │                       │                       │
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│ Station Service │    │ Coupon Service  │    │ Raffle Service  │
+│   (Port 8083)   │    │   (Port 8084)   │    │   (Port 8085)   │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+         │                       │                       │
+         └───────────────────────┼───────────────────────┘
+                                 │
+                    ┌─────────────────┐
+                    │ Dashboard API   │
+                    │   (Port 8086)   │
+                    └─────────────────┘
+```
 
-### Patrones Implementados
+### Stack Tecnológico
 
-- **Event Sourcing:** Para trazabilidad completa
-- **CQRS:** Separación de comandos y consultas
-- **Circuit Breaker:** Resiliencia entre servicios
-- **Outbox Pattern:** Consistencia eventual
+- **Backend**: Kotlin + Spring Boot 3.2
+- **Base de Datos**: PostgreSQL 15 con PostGIS
+- **Cache**: Redis Cluster
+- **Message Queue**: RabbitMQ
+- **Search Engine**: Elasticsearch
+- **Containerización**: Docker + Kubernetes
+- **Observabilidad**: Prometheus + Grafana + Jaeger
+- **CI/CD**: GitHub Actions
+- **Security**: HashiCorp Vault
 
-### Seguridad
+### Patrones de Diseño
 
-- **JWT Tokens:** Autenticación stateless
-- **QR Firmados:** Prevención de falsificación
-- **Rate Limiting:** Protección contra abuso
-- **HTTPS/TLS:** Cifrado en tránsito
+- **Arquitectura Hexagonal** en todos los servicios
+- **Domain-Driven Design** (DDD)
+- **Event Sourcing** para auditoría
+- **CQRS** para separación de lecturas/escrituras
+- **Circuit Breaker** para resilencia
+- **Saga Pattern** para transacciones distribuidas
 
-## 📱 Apps Móviles
+## 🚀 Quick Start
 
-### Cliente (React Native + Expo)
+### Prerrequisitos
 
-- Escáner QR integrado
-- Sistema de anuncios gamificado
-- Dashboard personal de tickets
-- Notificaciones push para sorteos
+- **Java 21+**
+- **Docker & Docker Compose**
+- **Git**
+- **8GB RAM mínimo**
 
-### Empleado (React Native + Expo)
+### 1. Clonar el Repositorio
 
-- Interfaz ultra-simple
-- Generador QR dinámico
-- Estadísticas en tiempo real
-- Modo offline básico
+```bash
+git clone https://github.com/gasolinera-jsm/gasolinera-jsm-ultimate.git
+cd gasolinera-jsm-ultimate
+```
 
-## 🌟 Características Avanzadas
+### 2. Configurar Variables de Entorno
 
-### Gamificación
+```bash
+# Copiar archivo de ejemplo
+cp .env.example .env.local
 
-- Anuncios progresivos (10s → 10min)
-- Multiplicadores de tickets
-- Sistema de logros
-- Pantallas de celebración
+# Editar configuración
+nano .env.local
+```
 
-### Analytics
+### 3. Generar Claves JWT
 
-- Métricas en tiempo real
-- Dashboards interactivos
-- Reportes automatizados
-- Segmentación de usuarios
+```bash
+# Ejecutar script de setup
+./scripts/setup-jwt-keys.sh
 
-### Escalabilidad
+# O manualmente
+mkdir -p config/jwt
+openssl genrsa -out config/jwt/private.pem 2048
+openssl rsa -in config/jwt/private.pem -pubout -out config/jwt/public.pem
+```
 
-- Arquitectura de microservicios
-- Cache distribuido con Redis
-- Load balancing con Nginx
-- Auto-scaling en Kubernetes
+### 4. Levantar el Sistema Completo
+
+```bash
+# Desarrollo completo
+docker-compose -f docker-compose.dev.yml up -d
+
+# Verificar que todos los servicios estén corriendo
+docker-compose ps
+```
+
+### 5. Inicializar Datos de Prueba
+
+```bash
+# Ejecutar migraciones y datos de prueba
+./scripts/init-dev-data.sh
+
+# Verificar datos
+curl http://localhost:8080/api/v1/stations/nearby?latitude=19.4326&longitude=-99.1332&radius=10
+```
+
+### 6. Acceder a las Interfaces
+
+- **API Gateway**: http://localhost:8080
+- **Swagger UI**: http://localhost:8080/swagger-ui.html
+- **Grafana**: http://localhost:3000 (admin/admin)
+- **RabbitMQ Management**: http://localhost:15672 (guest/guest)
+- **Elasticsearch**: http://localhost:9200
+
+## 📁 Estructura del Proyecto
+
+```
+gasolinera-jsm-ultimate/
+├── api-gateway/                   # API Gateway (Puerto 8080)
+│   ├── src/main/kotlin/
+│   ├── Dockerfile
+│   └── README.md
+├── auth-service/                  # Servicio de Autenticación (Puerto 8081)
+│   ├── src/main/kotlin/
+│   ├── Dockerfile
+│   └── README.md
+├── station-service/               # Servicio de Estaciones (Puerto 8083)
+│   ├── src/main/kotlin/
+│   ├── Dockerfile
+│   └── README.md
+├── coupon-service/                # Servicio de Cupones (Puerto 8084)
+│   ├── src/main/kotlin/
+│   ├── Dockerfile
+│   └── README.md
+├── raffle-service/                # Servicio de Rifas (Puerto 8085)
+│   ├── src/main/kotlin/
+│   ├── Dockerfile
+│   └── README.md
+├── dashboard-service/             # Servicio de Dashboard (Puerto 8086)
+│   ├── src/main/kotlin/
+│   ├── Dockerfile
+│   └── README.md
+├── shared/                        # Librerías compartidas
+│   ├── common/                    # Utilidades comunes
+│   ├── events/                    # Eventos de dominio
+│   └── security/                  # Componentes de seguridad
+├── infrastructure/                # Infraestructura como código
+│   ├── kubernetes/                # Manifests de K8s
+│   ├── terraform/                 # Infraestructura en la nube
+│   └── monitoring/                # Configuración de monitoreo
+├── scripts/                       # Scripts de automatización
+│   ├── setup-jwt-keys.sh
+│   ├── init-dev-data.sh
+│   └── deploy.sh
+├── docs/                          # Documentación
+│   ├── api/                       # Documentación de APIs
+│   ├── architecture/              # Diagramas de arquitectura
+│   └── deployment/                # Guías de deployment
+├── testing/                       # Testing compartido
+│   ├── shared/                    # Utilidades de testing
+│   └── e2e-tests/                 # Tests end-to-end
+├── docker-compose.dev.yml         # Desarrollo local
+├── docker-compose.prod.yml        # Producción
+├── .env.example                   # Variables de entorno ejemplo
+└── README.md                      # Este archivo
+```
+
+## 🔧 Desarrollo Local
+
+### Ejecutar Servicios Individuales
+
+```bash
+# Solo base de datos y cache
+docker-compose -f docker-compose.dev.yml up -d postgres redis rabbitmq
+
+# Auth Service
+cd auth-service
+./gradlew bootRun --args='--spring.profiles.active=local'
+
+# Station Service
+cd station-service
+./gradlew bootRun --args='--spring.profiles.active=local'
+
+# Coupon Service
+cd coupon-service
+./gradlew bootRun --args='--spring.profiles.active=local'
+```
+
+### Hot Reload para Desarrollo
+
+```bash
+# Habilitar hot reload
+export SPRING_DEVTOOLS_RESTART_ENABLED=true
+
+# Ejecutar con hot reload
+./gradlew bootRun --continuous
+```
+
+### Debugging
+
+```bash
+# Ejecutar con debug habilitado
+./gradlew bootRun --debug-jvm --args='--spring.profiles.active=local,debug'
+
+# Conectar debugger en puerto 5005
+```
+
+## 🧪 Testing
+
+### Tests Unitarios
+
+```bash
+# Ejecutar todos los tests unitarios
+./gradlew test
+
+# Tests con coverage
+./gradlew jacocoTestReport
+
+# Ver reporte de coverage
+open build/reports/jacoco/test/html/index.html
+```
+
+### Tests de Integración
+
+```bash
+# Tests de integración con TestContainers
+./gradlew integrationTest
+
+# Tests específicos de un servicio
+cd auth-service && ./gradlew integrationTest
+```
+
+### Tests End-to-End
+
+```bash
+# Tests E2E completos
+cd e2e-tests
+./gradlew test
+
+# Tests de performance con K6
+k6 run src/test/k6/load-test.js
+```
+
+### Quality Gates
+
+```bash
+# Análisis de calidad con SonarQube
+./gradlew sonarqube
+
+# Verificar quality gates
+curl -u admin:admin http://localhost:9000/api/qualitygates/project_status?projectKey=gasolinera-jsm
+```
+
+## 🐳 Docker y Containerización
+
+### Build de Imágenes
+
+```bash
+# Build todas las imágenes
+./scripts/build-all-images.sh
+
+# Build imagen específica
+docker build -t gasolinera-jsm/auth-service:latest auth-service/
+
+# Build multi-platform
+docker buildx build --platform linux/amd64,linux/arm64 -t gasolinera-jsm/auth-service:latest auth-service/
+```
+
+### Docker Compose Profiles
+
+```bash
+# Solo servicios core
+docker-compose --profile core up -d
+
+# Con monitoreo
+docker-compose --profile monitoring up -d
+
+# Producción completa
+docker-compose -f docker-compose.prod.yml up -d
+```
+
+## ☸️ Kubernetes Deployment
+
+### Desarrollo Local con Minikube
+
+```bash
+# Iniciar minikube
+minikube start --memory=8192 --cpus=4
+
+# Aplicar manifests
+kubectl apply -f infrastructure/kubernetes/
+
+# Verificar deployment
+kubectl get pods -n gasolinera-jsm
+```
+
+### Producción
+
+```bash
+# Configurar contexto de producción
+kubectl config use-context production
+
+# Deploy con Helm
+helm install gasolinera-jsm ./infrastructure/helm/gasolinera-jsm
+
+# Verificar deployment
+kubectl get all -n gasolinera-jsm
+```
+
+### Scaling
+
+```bash
+# Escalar servicios
+kubectl scale deployment auth-service --replicas=5 -n gasolinera-jsm
+
+# Auto-scaling
+kubectl autoscale deployment coupon-service --cpu-percent=70 --min=3 --max=10 -n gasolinera-jsm
+```
+
+## 📊 Monitoreo y Observabilidad
+
+### Métricas con Prometheus
+
+```bash
+# Verificar métricas
+curl http://localhost:8080/actuator/prometheus
+
+# Queries útiles
+sum(rate(http_requests_total[5m])) by (service)
+histogram_quantile(0.95, http_request_duration_seconds_bucket)
+```
+
+### Dashboards de Grafana
+
+- **System Overview**: Métricas generales del sistema
+- **Service Performance**: Performance por microservicio
+- **Business Metrics**: KPIs de negocio (cupones, rifas)
+- **Infrastructure**: Métricas de infraestructura
+
+### Distributed Tracing
+
+```bash
+# Ver traces en Jaeger
+open http://localhost:16686
+
+# Buscar traces por operación
+curl "http://localhost:16686/api/traces?service=coupon-service&operation=purchase-coupon"
+```
+
+### Logs Centralizados
+
+```bash
+# Ver logs agregados
+docker-compose logs -f --tail=100
+
+# Buscar en logs específicos
+docker-compose logs coupon-service | grep "ERROR"
+
+# Logs estructurados con jq
+docker-compose logs --no-color coupon-service | jq '.message'
+```
+
+## 🔐 Seguridad
+
+### Configuración de Vault
+
+```bash
+# Inicializar Vault
+vault operator init
+
+# Unsealing
+vault operator unseal <key1>
+vault operator unseal <key2>
+vault operator unseal <key3>
+
+# Configurar secrets
+vault kv put secret/gasolinera-jsm/auth jwt-secret="your-secret"
+```
+
+### Rotación de Secretos
+
+```bash
+# Rotar JWT keys
+./scripts/rotate-jwt-keys.sh
+
+# Rotar database passwords
+./scripts/rotate-db-passwords.sh
+```
+
+### Security Scanning
+
+```bash
+# Scan de vulnerabilidades en imágenes
+trivy image gasolinera-jsm/auth-service:latest
+
+# Scan de dependencias
+./gradlew dependencyCheckAnalyze
+```
+
+## 🚀 Deployment en Producción
+
+### Variables de Entorno Requeridas
+
+```bash
+# Database
+DATABASE_URL=jdbc:postgresql://prod-db.example.com:5432/gasolinera_jsm
+DATABASE_USERNAME=gasolinera_user
+DATABASE_PASSWORD=super_secure_password
+
+# Redis
+REDIS_HOST=redis-cluster.example.com
+REDIS_PASSWORD=redis_secure_password
+
+# RabbitMQ
+RABBITMQ_HOST=rabbitmq-cluster.example.com
+RABBITMQ_USERNAME=gasolinera_user
+RABBITMQ_PASSWORD=rabbitmq_secure_password
+
+# Payment Gateways
+STRIPE_SECRET_KEY=sk_live_your_live_key
+PAYPAL_CLIENT_ID=your_paypal_client_id
+
+# Security
+JWT_PRIVATE_KEY_PATH=/app/secrets/jwt/private.pem
+JWT_PUBLIC_KEY_PATH=/app/secrets/jwt/public.pem
+
+# Observability
+JAEGER_ENDPOINT=http://jaeger:14268/api/traces
+PROMETHEUS_ENABLED=true
+```
+
+### Blue-Green Deployment
+
+```bash
+# Deploy nueva versión (green)
+./scripts/deploy-green.sh v1.1.0
+
+# Verificar health checks
+./scripts/verify-deployment.sh green
+
+# Switch traffic
+./scripts/switch-traffic.sh green
+
+# Cleanup old version
+./scripts/cleanup-blue.sh
+```
+
+### Rollback
+
+```bash
+# Rollback rápido
+kubectl rollout undo deployment/coupon-service -n gasolinera-jsm
+
+# Rollback a versión específica
+kubectl rollout undo deployment/coupon-service --to-revision=2 -n gasolinera-jsm
+```
+
+## 📈 Performance y Optimización
+
+### Database Optimization
+
+```sql
+-- Índices recomendados
+CREATE INDEX CONCURRENTLY idx_coupons_user_status ON coupons(user_id, status);
+CREATE INDEX CONCURRENTLY idx_stations_location ON stations USING GIST(location);
+CREATE INDEX CONCURRENTLY idx_redemptions_created_at ON redemptions(created_at);
+
+-- Partitioning para tablas grandes
+CREATE TABLE redemptions_2024_01 PARTITION OF redemptions
+FOR VALUES FROM ('2024-01-01') TO ('2024-02-01');
+```
+
+### Cache Strategy
+
+```bash
+# Warming de cache
+curl -X POST http://localhost:8083/api/v1/admin/cache/warm
+
+# Invalidación de cache
+redis-cli FLUSHDB
+
+# Métricas de cache
+curl http://localhost:8080/actuator/metrics/cache.gets
+```
+
+### Load Testing
+
+```bash
+# Test de carga con K6
+k6 run --vus 100 --duration 5m src/test/k6/purchase-coupon-test.js
+
+# Test de stress
+k6 run --vus 500 --duration 2m src/test/k6/stress-test.js
+```
+
+## 🔧 Troubleshooting
+
+### Problemas Comunes
+
+#### 1. Servicio No Responde
+
+```bash
+# Verificar health checks
+curl http://localhost:8080/actuator/health
+
+# Ver logs del servicio
+docker-compose logs -f auth-service
+
+# Verificar conectividad de red
+docker network ls
+docker network inspect gasolinera-jsm_default
+```
+
+#### 2. Base de Datos Lenta
+
+```sql
+-- Verificar queries lentas
+SELECT query, mean_exec_time, calls
+FROM pg_stat_statements
+ORDER BY mean_exec_time DESC
+LIMIT 10;
+
+-- Verificar locks
+SELECT * FROM pg_locks WHERE NOT granted;
+
+-- Estadísticas de tablas
+SELECT schemaname, tablename, n_tup_ins, n_tup_upd, n_tup_del
+FROM pg_stat_user_tables;
+```
+
+#### 3. Memory Issues
+
+```bash
+# Verificar uso de memoria
+docker stats
+
+# Heap dump de JVM
+jcmd <pid> GC.run_finalization
+jcmd <pid> VM.classloader_stats
+
+# Análisis de memory leaks
+./gradlew -Dorg.gradle.jvmargs="-XX:+HeapDumpOnOutOfMemoryError" test
+```
+
+#### 4. Message Queue Issues
+
+```bash
+# Verificar colas
+rabbitmqctl list_queues name messages
+
+# Ver conexiones
+rabbitmqctl list_connections
+
+# Purgar cola problemática
+rabbitmqctl purge_queue coupon.purchased
+```
+
+### Logs de Debug
+
+```yaml
+# application-debug.yml
+logging:
+  level:
+    com.gasolinerajsm: DEBUG
+    org.springframework.security: DEBUG
+    org.springframework.amqp: DEBUG
+    org.hibernate.SQL: DEBUG
+    org.springframework.transaction: DEBUG
+```
+
+## 📚 Documentación Adicional
+
+### APIs
+
+- [API Gateway Documentation](api-gateway/README.md)
+- [Auth Service API](auth-service/README.md)
+- [Station Service API](station-service/README.md)
+- [Coupon Service API](coupon-service/README.md)
+- [Swagger UI](http://localhost:8080/swagger-ui.html)
+
+### Arquitectura
+
+- [Architecture Decision Records](docs/architecture/ADRs/)
+- [System Design](docs/architecture/system-design.md)
+- [Database Schema](docs/architecture/database-schema.md)
+- [Event Flows](docs/architecture/event-flows.md)
+
+### Deployment
+
+- [Kubernetes Guide](docs/deployment/kubernetes.md)
+- [Docker Guide](docs/deployment/docker.md)
+- [CI/CD Pipeline](docs/deployment/cicd.md)
+- [Monitoring Setup](docs/deployment/monitoring.md)
+
+## 🤝 Contribución
+
+### Workflow de Desarrollo
+
+1. **Fork** el repositorio
+2. **Crear** feature branch (`git checkout -b feature/amazing-feature`)
+3. **Commit** cambios (`git commit -m 'Add amazing feature'`)
+4. **Push** al branch (`git push origin feature/amazing-feature`)
+5. **Crear** Pull Request
+
+### Estándares de Código
+
+- **Kotlin Style Guide**: Seguir [Kotlin Coding Conventions](https://kotlinlang.org/docs/coding-conventions.html)
+- **Testing**: Mínimo 80% de coverage
+- **Documentation**: Documentar APIs con OpenAPI
+- **Commits**: Usar [Conventional Commits](https://www.conventionalcommits.org/)
+
+### Code Review
+
+- **Automated Checks**: Todos los checks de CI deben pasar
+- **Manual Review**: Al menos 2 aprobaciones requeridas
+- **Security Review**: Para cambios en autenticación/autorización
+- **Performance Review**: Para cambios que afecten performance
+
+## 📄 Licencia
+
+Este proyecto es propiedad de **Gasolinera JSM**. Todos los derechos reservados.
+
+Para más información sobre licenciamiento, contactar: legal@gasolinera-jsm.com
+
+## 📞 Soporte y Contacto
+
+### Equipo de Desarrollo
+
+- **Tech Lead**: tech-lead@gasolinera-jsm.com
+- **Backend Team**: backend-team@gasolinera-jsm.com
+- **DevOps Team**: devops-team@gasolinera-jsm.com
+
+### Canales de Comunicación
+
+- **Slack**: #gasolinera-jsm-dev
+- **Email**: dev@gasolinera-jsm.com
+- **Issues**: [GitHub Issues](https://github.com/gasolinera-jsm/gasolinera-jsm-ultimate/issues)
+
+### Horarios de Soporte
+
+- **Desarrollo**: Lunes a Viernes, 9:00 AM - 6:00 PM (GMT-6)
+- **Producción**: 24/7 con on-call rotation
+- **Emergencias**: +52 55 1234 5678
+
+---
+
+## 🎯 Roadmap
+
+### Q1 2024
+
+- [ ] **Mobile App Integration** - SDK para aplicaciones móviles
+- [ ] **Advanced Analytics** - Machine learning para predicciones
+- [ ] **Multi-tenant Support** - Soporte para múltiples marcas
+- [ ] **International Expansion** - Soporte para múltiples países
+
+### Q2 2024
+
+- [ ] **Loyalty Program** - Sistema de puntos y recompensas
+- [ ] **Social Features** - Compartir cupones y referidos
+- [ ] **Advanced Fraud Detection** - ML para detección de fraude
+- [ ] **API Marketplace** - APIs públicas para terceros
+
+### Q3 2024
+
+- [ ] **IoT Integration** - Integración con bombas inteligentes
+- [ ] **Blockchain Rewards** - Tokens y NFTs como premios
+- [ ] **Voice Interface** - Integración con Alexa/Google Assistant
+- [ ] **Augmented Reality** - AR para encontrar estaciones
+
+---
+
+**🚀 ¡Construyendo el futuro de los combustibles digitales!**
+
+_Última actualización: Enero 2024 - Versión 1.0.0_

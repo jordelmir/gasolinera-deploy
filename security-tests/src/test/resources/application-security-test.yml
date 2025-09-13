@@ -1,0 +1,232 @@
+# Security Test Configuration
+spring:
+  profiles:
+    active: security-test
+
+  # Database configuration for security testing
+  datasource:
+    url: jdbc:postgresql://localhost:5432/gasolinera_security_db
+    username: security_user
+    password: security_password
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+
+  # JPA Configuration
+  jpa:
+    hibernate:
+      ddl-auto: none
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: false
+
+  # Redis Configuration
+  redis:
+    host: localhost
+    port: 6379
+    password: security_password
+    timeout: 5000ms
+
+  # Security Configuration
+  security:
+    jwt:
+      secret: security_test_jwt_secret_key_for_testing_only_do_not_use_in_production
+      expiration: 3600000 # 1 hour
+      refresh-expiration: 86400000 # 24 hours
+
+# Logging Configuration for security tests
+logging:
+  level:
+    com.gasolinerajsm: DEBUG
+    org.springframework.security: DEBUG
+    org.springframework.web: INFO
+    org.hibernate: WARN
+  pattern:
+    console: '%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n'
+
+# Management endpoints for security testing
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
+
+# Security test configuration
+security:
+  test:
+    # JWT Configuration for testing
+    jwt:
+      test-secret: test_jwt_secret_for_security_testing_only
+      test-expiration: 300000 # 5 minutes for testing
+      invalid-secret: invalid_secret_for_negative_testing
+
+    # Test user credentials
+    users:
+      admin:
+        phone: '+525555000001'
+        role: 'SYSTEM_ADMIN'
+        password: 'admin_test_password'
+
+      station-admin:
+        phone: '+525555000002'
+        role: 'STATION_ADMIN'
+        password: 'station_admin_test_password'
+
+      employee:
+        phone: '+525555000005'
+        role: 'EMPLOYEE'
+        password: 'employee_test_password'
+
+      customer:
+        phone: '+525555001001'
+        role: 'CUSTOMER'
+        password: 'customer_test_password'
+
+    # Service endpoints for security testing
+    services:
+      auth-service:
+        base-url: http://localhost:8081
+        endpoints:
+          login: /api/auth/login
+          register: /api/auth/register
+          refresh: /api/auth/refresh
+          logout: /api/auth/logout
+          profile: /api/auth/user/profile
+          admin: /api/auth/admin/users
+
+      api-gateway:
+        base-url: http://localhost:8080
+        endpoints:
+          health: /actuator/health
+          metrics: /actuator/metrics
+          admin: /admin
+
+    # Security test scenarios
+    scenarios:
+      # Authentication tests
+      authentication:
+        valid-credentials: true
+        invalid-credentials: true
+        expired-tokens: true
+        malformed-tokens: true
+        missing-tokens: true
+
+      # Authorization tests
+      authorization:
+        role-based-access: true
+        resource-ownership: true
+        privilege-escalation: true
+        cross-tenant-access: true
+
+      # Input validation tests
+      input-validation:
+        sql-injection: true
+        xss-attacks: true
+        command-injection: true
+        path-traversal: true
+        buffer-overflow: true
+
+      # Session management tests
+      session-management:
+        session-fixation: true
+        session-hijacking: true
+        concurrent-sessions: true
+        session-timeout: true
+
+    # Penetration test configuration
+    penetration:
+      # Common attack patterns
+      attacks:
+        - type: 'sql-injection'
+          payloads:
+            [
+              "' OR '1'='1",
+              "'; DROP TABLE users; --",
+              "' UNION SELECT * FROM users --",
+            ]
+        - type: 'xss'
+          payloads:
+            [
+              "<script>alert('XSS')</script>",
+              "<img src=x onerror=alert('XSS')>",
+              "javascript:alert('XSS')",
+            ]
+        - type: 'command-injection'
+          payloads: ['; ls -la', '| whoami', '&& cat /etc/passwd']
+        - type: 'path-traversal'
+          payloads:
+            [
+              '../../../etc/passwd',
+              "..\\..\\..\\windows\\system32\\drivers\\etc\\hosts",
+              '....//....//....//etc/passwd',
+            ]
+
+      # Brute force configuration
+      brute-force:
+        max-attempts: 100
+        delay-between-attempts: 100ms
+        common-passwords: ['password', '123456', 'admin', 'test', 'password123']
+
+    # Error handling test configuration
+    error-handling:
+      # Test various error conditions
+      conditions:
+        - type: 'database-connection-failure'
+          description: 'Test behavior when database is unavailable'
+        - type: 'external-service-timeout'
+          description: 'Test behavior when external services timeout'
+        - type: 'memory-exhaustion'
+          description: 'Test behavior under memory pressure'
+        - type: 'invalid-input-data'
+          description: 'Test handling of malformed input data'
+        - type: 'concurrent-access-conflicts'
+          description: 'Test handling of concurrent access to resources'
+
+      # Expected error responses
+      expected-responses:
+        authentication-failure: 401
+        authorization-failure: 403
+        resource-not-found: 404
+        validation-failure: 400
+        server-error: 500
+        service-unavailable: 503
+
+    # Security headers validation
+    security-headers:
+      required-headers:
+        - 'X-Content-Type-Options: nosniff'
+        - 'X-Frame-Options: DENY'
+        - 'X-XSS-Protection: 1; mode=block'
+        - 'Strict-Transport-Security: max-age=31536000; includeSubDomains'
+        - "Content-Security-Policy: default-src 'self'"
+        - 'Referrer-Policy: strict-origin-when-cross-origin'
+
+    # Rate limiting tests
+    rate-limiting:
+      endpoints:
+        - path: '/api/auth/login'
+          limit: 5
+          window: 60s
+        - path: '/api/auth/otp/request'
+          limit: 3
+          window: 300s
+        - path: '/api/coupons/validate'
+          limit: 100
+          window: 60s
+
+    # Reporting configuration
+    reporting:
+      enabled: true
+      output-dir: build/reports/security
+      formats: ['html', 'json', 'xml']
+      include-details: true
+      severity-levels: ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO']

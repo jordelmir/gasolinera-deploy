@@ -1,0 +1,54 @@
+# Shared Base Image for Gasolinera JSM Services
+# This creates a common base with shared dependencies to reduce build time and image size
+
+# Build stage - Common Gradle setup
+FROM gradle:8.8.0-jdk17-alpine AS gradle-base
+
+# Set working directory
+WORKDIR /app
+
+# Create non-root user for security
+RUN addgroup -g 1001 -S gradle && \
+    adduser -S gradle -u 1001 -G gradle
+
+# Install common build tools
+RUN apk add --no-cache \
+    git \
+    curl \
+    bash
+
+# Copy dependency files for shared modules
+COPY --chown=gradle:gradle build.gradle.kts settings.gradle.kts gradle.properties ./
+COPY --chown=gradle:gradle gradle/ ./gradle/
+
+# Copy shared modules build files
+COPY --chown=gradle:gradle shared/common/build.gradle.kts ./shared/common/
+COPY --chown=gradle:gradle shared/messaging/build.gradle.kts ./shared/messaging/
+COPY --chown=gradle:gradle shared/security/build.gradle.kts ./shared/security/
+
+# Pre-download common dependencies
+RUN gradle dependencies --no-daemon || true
+
+# Copy and build shared modules
+COPY --chown=gradle:gradle shared/ ./shared/
+RUN gradle :shared:common:build :shared:messaging:build :shared:security:build --no-daemon --parallel
+
+# Runtime base - Common runtime setup
+FROM gcr.io/distroless/java17-debian12:nonroot AS runtime-base
+
+# Set working directory
+WORKDIR /app
+
+# Use non-root user
+USER nonroot:nonroot
+
+# Common JVM options for all services
+ENV JAVA_OPTS_BASE="-XX:+UseContainerSupport -XX:+UseG1GC -XX:+UseStringDeduplication -Djava.security.egd=file:/dev/./urandom"
+
+# Common labels
+LABEL maintainer="Gasolinera JSM Team"
+LABEL project="gasolinera-jsm-ultimate"
+LABEL version="1.0.0"
+
+# Expose common port
+EXPOSE 8080

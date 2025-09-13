@@ -1,32 +1,29 @@
 server:
   port: 8080
+  servlet:
+    context-path: /
 
 spring:
   application:
     name: api-gateway
 
-  profiles:
-    active: ${SPRING_PROFILES_ACTIVE:dev}
-
   cloud:
     gateway:
       default-filters:
         - DedupeResponseHeader=Access-Control-Allow-Credentials Access-Control-Allow-Origin
+        - AddRequestHeader=X-Gateway, api-gateway
       globalcors:
         corsConfigurations:
           '[/**]':
             allowedOriginPatterns: '*'
-            allowedMethods:
-              - GET
-              - POST
-              - PUT
-              - DELETE
-              - OPTIONS
+            allowedMethods: '*'
             allowedHeaders: '*'
             allowCredentials: true
             maxAge: 3600
-
-      # Circuit breaker configuration
+      discovery:
+        locator:
+          enabled: false
+          lower-case-service-id: true
       httpclient:
         connect-timeout: 5000
         response-timeout: 30s
@@ -38,42 +35,29 @@ spring:
     oauth2:
       resourceserver:
         jwt:
-          issuer-uri: ${JWT_ISSUER_URI:http://auth-service:8081}
-          jwk-set-uri: ${JWT_JWK_SET_URI:http://auth-service:8081/.well-known/jwks.json}
+          issuer-uri: ${JWT_ISSUER_URI:http://localhost:8080/auth/realms/gasolinera}
+          jwk-set-uri: ${JWT_JWK_SET_URI:http://localhost:8080/auth/realms/gasolinera/protocol/openid-connect/certs}
 
-# Resilience4j Circuit Breaker Configuration
-resilience4j:
-  circuitbreaker:
-    instances:
-      ad-engine-cb:
-        registerHealthIndicator: true
-        slidingWindowSize: 10
-        minimumNumberOfCalls: 5
-        permittedNumberOfCallsInHalfOpenState: 3
-        automaticTransitionFromOpenToHalfOpenEnabled: true
-        waitDurationInOpenState: 5s
-        failureRateThreshold: 50
-        eventConsumerBufferSize: 10
-      raffle-service-cb:
-        registerHealthIndicator: true
-        slidingWindowSize: 10
-        minimumNumberOfCalls: 5
-        permittedNumberOfCallsInHalfOpenState: 3
-        automaticTransitionFromOpenToHalfOpenEnabled: true
-        waitDurationInOpenState: 5s
-        failureRateThreshold: 50
-        eventConsumerBufferSize: 10
-      redemption-service-cb:
-        registerHealthIndicator: true
-        slidingWindowSize: 10
-        minimumNumberOfCalls: 5
-        permittedNumberOfCallsInHalfOpenState: 3
-        automaticTransitionFromOpenToHalfOpenEnabled: true
-        waitDurationInOpenState: 5s
-        failureRateThreshold: 50
-        eventConsumerBufferSize: 10
+  redis:
+    host: ${REDIS_HOST:localhost}
+    port: ${REDIS_PORT:6379}
+    password: ${REDIS_PASSWORD:}
+    database: 0
+    timeout: 2000ms
+    lettuce:
+      pool:
+        max-active: 8
+        max-idle: 8
+        min-idle: 0
+        max-wait: -1ms
 
-# Actuator configuration
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+    deserialization:
+      fail-on-unknown-properties: false
+    default-property-inclusion: non_null
+
 management:
   endpoints:
     web:
@@ -82,84 +66,166 @@ management:
   endpoint:
     health:
       show-details: always
+    gateway:
+      enabled: true
   metrics:
     export:
       prometheus:
         enabled: true
+  tracing:
+    sampling:
+      probability: 1.0
 
-# Logging configuration
 logging:
   level:
-    org.springframework.cloud.gateway: DEBUG
+    com.gasolinerajsm.apigateway: INFO
+    org.springframework.cloud.gateway: INFO
     org.springframework.security: DEBUG
-    com.gasolinerajsm.apigateway: DEBUG
+    org.springframework.web.reactive: INFO
+    io.github.resilience4j: INFO
+    AUDIT: INFO
   pattern:
-    console: '%d{yyyy-MM-dd HH:mm:ss} - %msg%n'
-    file: '%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n'
+    console: '%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level [%X{correlationId:-}] %logger{36} - %msg%n'
+    file: '%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level [%X{correlationId:-}] %logger{36} - %msg%n'
+  file:
+    name: logs/api-gateway.log
 
-# Service URLs (can be overridden by environment variables)
-services:
-  auth-service:
-    url: ${AUTH_SERVICE_URL:http://auth-service:8081}
-  coupon-service:
-    url: ${COUPON_SERVICE_URL:http://coupon-service:8084}
-  station-service:
-    url: ${STATION_SERVICE_URL:http://station-service:8083}
-  ad-engine:
-    url: ${AD_ENGINE_URL:http://ad-engine:8082}
-  raffle-service:
-    url: ${RAFFLE_SERVICE_URL:http://raffle-service:8085}
-  redemption-service:
-    url: ${REDEMPTION_SERVICE_URL:http://redemption-service:8086}
+# Custom application properties
+app:
+  name: Gasolinera JSM API Gateway
+  version: 1.0.0
+  description: API Gateway for Gasolinera JSM Platform
+
+  security:
+    jwt:
+      header: Authorization
+      prefix: 'Bearer '
+      secret: ${JWT_SECRET:your-secret-key}
+      expiration: 86400000 # 24 hours
+
+  rate-limiting:
+    enabled: true
+    default-requests-per-second: 10
+    default-burst-capacity: 20
+    strict-requests-per-second: 5
+    strict-burst-capacity: 10
+    lenient-requests-per-second: 50
+    lenient-burst-capacity: 100
+
+  circuit-breaker:
+    enabled: true
+    failure-rate-threshold: 50.0
+    slow-call-rate-threshold: 50.0
+    slow-call-duration-threshold: 2000
+    sliding-window-size: 10
+    minimum-number-of-calls: 5
+    wait-duration-in-open-state: 30000
+    permitted-number-of-calls-in-half-open-state: 3
+
+  services:
+    auth-service:
+      url: ${AUTH_SERVICE_URL:http://auth-service:8080}
+      timeout: 15000
+      circuit-breaker:
+        failure-rate-threshold: 60.0
+        wait-duration-in-open-state: 60000
+    station-service:
+      url: ${STATION_SERVICE_URL:http://station-service:8082}
+      timeout: 8000
+      circuit-breaker:
+        failure-rate-threshold: 50.0
+        wait-duration-in-open-state: 45000
+    coupon-service:
+      url: ${COUPON_SERVICE_URL:http://coupon-service:8081}
+      timeout: 6000
+      circuit-breaker:
+        failure-rate-threshold: 45.0
+        wait-duration-in-open-state: 30000
+    redemption-service:
+      url: ${REDEMPTION_SERVICE_URL:http://redemption-service:8083}
+      timeout: 12000
+      circuit-breaker:
+        failure-rate-threshold: 40.0
+        wait-duration-in-open-state: 45000
+    ad-engine:
+      url: ${AD_ENGINE_URL:http://ad-engine:8084}
+      timeout: 5000
+      circuit-breaker:
+        failure-rate-threshold: 70.0
+        wait-duration-in-open-state: 20000
+    raffle-service:
+      url: ${RAFFLE_SERVICE_URL:http://raffle-service:8085}
+      timeout: 10000
+      circuit-breaker:
+        failure-rate-threshold: 50.0
+        wait-duration-in-open-state: 40000
+
+# Actuator info
+info:
+  app:
+    name: ${app.name}
+    version: ${app.version}
+    description: ${app.description}
+  java:
+    version: ${java.version}
+  spring:
+    version: ${spring-boot.version}
 
 ---
-# Development profile
 spring:
   config:
     activate:
-      on-profile: dev
+      on-profile: docker
 
   security:
     oauth2:
       resourceserver:
         jwt:
-          issuer-uri: http://localhost:8081
-          jwk-set-uri: http://localhost:8081/.well-known/jwks.json
+          issuer-uri: http://vault:8200/auth/realms/gasolinera
+          jwk-set-uri: http://vault:8200/auth/realms/gasolinera/protocol/openid-connect/certs
 
-services:
-  auth-service:
-    url: http://localhost:8081
-  coupon-service:
-    url: http://localhost:8084
-  station-service:
-    url: http://localhost:8083
-  ad-engine:
-    url: http://localhost:8082
-  raffle-service:
-    url: http://localhost:8085
-  redemption-service:
-    url: http://localhost:8086
+  redis:
+    host: redis
 
-logging:
-  level:
-    root: INFO
-    com.gasolinerajsm.apigateway: DEBUG
+app:
+  services:
+    auth-service:
+      url: http://auth-service:8080
+    station-service:
+      url: http://station-service:8082
+    coupon-service:
+      url: http://coupon-service:8081
+    redemption-service:
+      url: http://redemption-service:8083
+    ad-engine:
+      url: http://ad-engine:8084
+    raffle-service:
+      url: http://raffle-service:8085
 
 ---
-# Production profile
 spring:
   config:
     activate:
-      on-profile: prod
+      on-profile: test
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://localhost:8080/auth/realms/gasolinera
+          jwk-set-uri: http://localhost:8080/auth/realms/gasolinera/protocol/openid-connect/certs
+
+  redis:
+    host: localhost
+    port: 6379
+
+app:
+  rate-limiting:
+    enabled: false
+  circuit-breaker:
+    enabled: false
 
 logging:
   level:
-    root: WARN
-    com.gasolinerajsm.apigateway: INFO
-  file:
-    name: /var/log/api-gateway.log
-
-management:
-  endpoint:
-    health:
-      show-details: when-authorized
+    com.gasolinerajsm.apigateway: DEBUG
+    org.springframework.test: INFO

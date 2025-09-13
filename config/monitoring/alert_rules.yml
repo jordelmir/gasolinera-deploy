@@ -1,0 +1,299 @@
+# Prometheus Alert Rules for Gasolinera JSM
+groups:
+  - name: gasolinera-jsm-performance
+    interval: 30s
+    rules:
+      # High Response Time Alerts
+      - alert: HighResponseTime
+        expr: histogram_quantile(0.95, rate(http_server_requests_seconds_bucket{job=~".*-service"}[5m])) > 0.5
+        for: 2m
+        labels:
+          severity: warning
+          team: backend
+          service: "{{ $labels.job }}"
+        annotations:
+          summary: "High response time detected on {{ $labels.job }}"
+          description: "95th percentile response time is {{ $value }}s for service {{ $labels.job }}"
+          runbook_url: "https://docs.gasolinera-jsm.com/runbooks/high-response-time"
+
+      - alert: CriticalResponseTime
+        expr: histogram_quantile(0.95, rate(http_server_requests_seconds_bucket{job=~".*-service"}[5m])) > 1.0
+        for: 1m
+        labels:
+          severity: critical
+          team: backend
+          service: "{{ $labels.job }}"
+        annotations:
+          summary: "Critical response time detected on {{ $labels.job }}"
+          description: "95th percentile response time is {{ $value }}s for service {{ $labels.job }}"
+          runbook_url: "https://docs.gasolinera-jsm.com/runbooks/critical-response-time"
+
+      # High Error Rate Alerts
+      - alert: HighErrorRate
+        expr: rate(http_server_requests_total{status=~"5.."}[5m]) / rate(http_server_requests_total[5m]) > 0.01
+        for: 2m
+        labels:
+          severity: warning
+          team: backend
+          service: "{{ $labels.job }}"
+        annotations:
+          summary: "High error rate detected on {{ $labels.job }}"
+          description: "Error rate is {{ $value | humanizePercentage }} for service {{ $labels.job }}"
+          runbook_url: "https://docs.gasolinera-jsm.com/runbooks/high-error-rate"
+
+      - alert: CriticalErrorRate
+        expr: rate(http_server_requests_total{status=~"5.."}[5m]) / rate(http_server_requests_total[5m]) > 0.05
+        for: 1m
+        labels:
+          severity: critical
+          team: backend
+          service: "{{ $labels.job }}"
+        annotations:
+          summary: "Critical error rate detected on {{ $labels.job }}"
+          description: "Error rate is {{ $value | humanizePercentage }} for service {{ $labels.job }}"
+          runbook_url: "https://docs.gasolinera-jsm.com/runbooks/critical-error-rate"
+
+      # Memory Usage Alerts
+      - alert: HighMemoryUsage
+        expr: (jvm_memory_used_bytes{area="heap"} / jvm_memory_max_bytes{area="heap"}) > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          team: backend
+          service: "{{ $labels.job }}"
+        annotations:
+          summary: "High memory usage detected on {{ $labels.job }}"
+          description: "Memory usage is {{ $value | humanizePercentage }} for service {{ $labels.job }}"
+          runbook_url: "https://docs.gasolinera-jsm.com/runbooks/high-memory-usage"
+
+      - alert: CriticalMemoryUsage
+        expr: (jvm_memory_used_bytes{area="heap"} / jvm_memory_max_bytes{area="heap"}) > 0.9
+        for: 2m
+        labels:
+          severity: critical
+          team: backend
+          service: "{{ $labels.job }}"
+        annotations:
+          summary: "Critical memory usage detected on {{ $labels.job }}"
+          description: "Memory usage is {{ $value | humanizePercentage }} for service {{ $labels.job }}"
+          runbook_url: "https://docs.gasolinera-jsm.com/runbooks/critical-memory-usage"
+
+      # CPU Usage Alerts
+      - alert: HighCPUUsage
+        expr: rate(process_cpu_seconds_total[5m]) > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          team: backend
+          service: "{{ $labels.job }}"
+        annotations:
+          summary: "High CPU usage detected on {{ $labels.job }}"
+          description: "CPU usage is {{ $value | humanizePercentage }} for service {{ $labels.job }}"
+          runbook_url: "https://docs.gasolinera-jsm.com/runbooks/high-cpu-usage"
+
+      # Garbage Collection Alerts
+      - alert: HighGCTime
+        expr: rate(jvm_gc_collection_seconds_sum[5m]) > 0.1
+        for: 3m
+        labels:
+          severity: warning
+          team: backend
+          service: "{{ $labels.job }}"
+        annotations:
+          summary: "High GC time detected on {{ $labels.job }}"
+          description: "GC time is {{ $value }}s per second for service {{ $labels.job }}"
+          runbook_url: "https://docs.gasolinera-jsm.com/runbooks/high-gc-time"
+
+      # Database Connection Pool Alerts
+      - alert: DatabaseConnectionPoolHigh
+        expr: (hikaricp_connections_active / hikaricp_connections_max) > 0.8
+        for: 2m
+        labels:
+          severity: warning
+          team: backend
+          service: "{{ $labels.job }}"
+        annotations:
+          summary: "Database connection pool usage high on {{ $labels.job }}"
+          description: "Connection pool usage is {{ $value | humanizePercentage }} for service {{ $labels.job }}"
+          runbook_url: "https://docs.gasolinera-jsm.com/runbooks/db-connection-pool-high"
+
+      - alert: DatabaseConnectionPoolExhausted
+        expr: (hikaricp_connections_active / hikaricp_connections_max) > 0.95
+        for: 1m
+        labels:
+          severity: critical
+          team: backend
+          service: "{{ $labels.job }}"
+        annotations:
+          summary: "Database connection pool nearly exhausted on {{ $labels.job }}"
+          description: "Connection pool usage is {{ $value | humanizePercentage }} for service {{ $labels.job }}"
+          runbook_url: "https://docs.gasolinera-jsm.com/runbooks/db-connection-pool-exhausted"
+
+      # Thread Pool Alerts
+      - alert: ThreadPoolHigh
+        expr: (executor_active_threads / executor_pool_max_threads) > 0.8
+        for: 3m
+        labels:
+          severity: warning
+          team: backend
+          service: "{{ $labels.job }}"
+        annotations:
+          summary: "Thread pool usage high on {{ $labels.job }}"
+          description: "Thread pool usage is {{ $value | humanizePercentage }} for service {{ $labels.job }}"
+
+  - name: gasolinera-jsm-business
+    interval: 60s
+    rules:
+      # Business Metrics Alerts
+      - alert: LowCouponCreationRate
+        expr: rate(coupon_created_total[10m]) < 0.1
+        for: 5m
+        labels:
+          severity: warning
+          team: business
+        annotations:
+          summary: "Low coupon creation rate detected"
+          description: "Coupon creation rate is {{ $value }} per second"
+
+      - alert: HighCouponRedemptionFailureRate
+        expr: rate(coupon_redemption_failed_total[5m]) / rate(coupon_redemption_total[5m]) > 0.05
+        for: 3m
+        labels:
+          severity: warning
+          team: business
+        annotations:
+          summary: "High coupon redemption failure rate"
+          description: "Redemption failure rate is {{ $value | humanizePercentage }}"
+
+      - alert: RaffleDrawFailure
+        expr: increase(raffle_draw_failed_total[1h]) > 0
+        for: 0m
+        labels:
+          severity: critical
+          team: business
+        annotations:
+          summary: "Raffle draw failure detected"
+          description: "{{ $value }} raffle draws have failed in the last hour"
+
+  - name: gasolinera-jsm-infrastructure
+    interval: 30s
+    rules:
+      # Database Alerts
+      - alert: PostgreSQLDown
+        expr: up{job="postgresql"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: infrastructure
+        annotations:
+          summary: "PostgreSQL is down"
+          description: "PostgreSQL database is not responding"
+
+      - alert: PostgreSQLHighConnections
+        expr: pg_stat_database_numbackends / pg_settings_max_connections > 0.8
+        for: 2m
+        labels:
+          severity: warning
+          team: infrastructure
+        annotations:
+          summary: "PostgreSQL high connection usage"
+          description: "PostgreSQL connection usage is {{ $value | humanizePercentage }}"
+
+      - alert: PostgreSQLSlowQueries
+        expr: rate(pg_stat_database_tup_returned[5m]) / rate(pg_stat_database_tup_fetched[5m]) < 0.1
+        for: 5m
+        labels:
+          severity: warning
+          team: infrastructure
+        annotations:
+          summary: "PostgreSQL slow queries detected"
+          description: "Query efficiency is {{ $value | humanizePercentage }}"
+
+      # Redis Alerts
+      - alert: RedisDown
+        expr: up{job="redis"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: infrastructure
+        annotations:
+          summary: "Redis is down"
+          description: "Redis cache is not responding"
+
+      - alert: RedisHighMemoryUsage
+        expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.9
+        for: 2m
+        labels:
+          severity: warning
+          team: infrastructure
+        annotations:
+          summary: "Redis high memory usage"
+          description: "Redis memory usage is {{ $value | humanizePercentage }}"
+
+      # RabbitMQ Alerts
+      - alert: RabbitMQDown
+        expr: up{job="rabbitmq"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: infrastructure
+        annotations:
+          summary: "RabbitMQ is down"
+          description: "RabbitMQ message broker is not responding"
+
+      - alert: RabbitMQHighQueueSize
+        expr: rabbitmq_queue_messages > 1000
+        for: 5m
+        labels:
+          severity: warning
+          team: infrastructure
+        annotations:
+          summary: "RabbitMQ high queue size"
+          description: "Queue {{ $labels.queue }} has {{ $value }} messages"
+
+      - alert: RabbitMQHighMemoryUsage
+        expr: rabbitmq_node_mem_used / rabbitmq_node_mem_limit > 0.8
+        for: 3m
+        labels:
+          severity: warning
+          team: infrastructure
+        annotations:
+          summary: "RabbitMQ high memory usage"
+          description: "RabbitMQ memory usage is {{ $value | humanizePercentage }}"
+
+  - name: gasolinera-jsm-sla
+    interval: 60s
+    rules:
+      # SLA Monitoring
+      - alert: SLAViolationAvailability
+        expr: (rate(http_server_requests_total{status!~"5.."}[5m]) / rate(http_server_requests_total[5m])) < 0.999
+        for: 5m
+        labels:
+          severity: critical
+          team: sre
+          sla: availability
+        annotations:
+          summary: "SLA violation: Availability below 99.9%"
+          description: "Service availability is {{ $value | humanizePercentage }} for {{ $labels.job }}"
+
+      - alert: SLAViolationLatency
+        expr: histogram_quantile(0.95, rate(http_server_requests_seconds_bucket[5m])) > 0.2
+        for: 5m
+        labels:
+          severity: critical
+          team: sre
+          sla: latency
+        annotations:
+          summary: "SLA violation: 95th percentile latency above 200ms"
+          description: "95th percentile latency is {{ $value }}s for {{ $labels.job }}"
+
+      - alert: SLAViolationThroughput
+        expr: rate(http_server_requests_total[5m]) < 10
+        for: 10m
+        labels:
+          severity: warning
+          team: sre
+          sla: throughput
+        annotations:
+          summary: "SLA violation: Throughput below 10 RPS"
+          description: "Request rate is {{ $value }} RPS for {{ $labels.job }}"

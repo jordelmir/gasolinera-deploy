@@ -1,0 +1,323 @@
+# Prometheus Alerting Rules for Gasolinera JSM
+# These rules define alerts for critical system and business metrics
+
+groups:
+  - name: gasolinera-system-alerts
+    rules:
+      # High Memory Usage Alert
+      - alert: HighMemoryUsage
+        expr: system_memory_usage_percent > 85
+        for: 5m
+        labels:
+          severity: warning
+          service: "{{ $labels.application }}"
+        annotations:
+          summary: "High memory usage detected"
+          description: "Memory usage is {{ $value }}% on {{ $labels.instance }}"
+
+      # Critical Memory Usage Alert
+      - alert: CriticalMemoryUsage
+        expr: system_memory_usage_percent > 95
+        for: 2m
+        labels:
+          severity: critical
+          service: "{{ $labels.application }}"
+        annotations:
+          summary: "Critical memory usage detected"
+          description: "Memory usage is {{ $value }}% on {{ $labels.instance }}"
+
+      # High CPU Usage Alert
+      - alert: HighCPUUsage
+        expr: system_cpu_usage_percent > 80
+        for: 10m
+        labels:
+          severity: warning
+          service: "{{ $labels.application }}"
+        annotations:
+          summary: "High CPU usage detected"
+          description: "CPU usage is {{ $value }}% on {{ $labels.instance }}"
+
+      # Critical CPU Usage Alert
+      - alert: CriticalCPUUsage
+        expr: system_cpu_usage_percent > 95
+        for: 5m
+        labels:
+          severity: critical
+          service: "{{ $labels.application }}"
+        annotations:
+          summary: "Critical CPU usage detected"
+          description: "CPU usage is {{ $value }}% on {{ $labels.instance }}"
+
+      # High Disk Usage Alert
+      - alert: HighDiskUsage
+        expr: system_disk_usage_percent > 85
+        for: 5m
+        labels:
+          severity: warning
+          service: "{{ $labels.application }}"
+        annotations:
+          summary: "High disk usage detected"
+          description: "Disk usage is {{ $value }}% on {{ $labels.instance }}"
+
+      # Critical Disk Usage Alert
+      - alert: CriticalDiskUsage
+        expr: system_disk_usage_percent > 95
+        for: 2m
+        labels:
+          severity: critical
+          service: "{{ $labels.application }}"
+        annotations:
+          summary: "Critical disk usage detected"
+          description: "Disk usage is {{ $value }}% on {{ $labels.instance }}"
+
+  - name: gasolinera-application-alerts
+    rules:
+      # Service Down Alert
+      - alert: ServiceDown
+        expr: up == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: "{{ $labels.job }}"
+        annotations:
+          summary: "Service is down"
+          description: "{{ $labels.job }} has been down for more than 1 minute"
+
+      # High Error Rate Alert
+      - alert: HighErrorRate
+        expr: rate(http_requests_errors_total[5m]) / rate(http_requests_total[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+          service: "{{ $labels.application }}"
+        annotations:
+          summary: "High error rate detected"
+          description: "Error rate is {{ $value | humanizePercentage }} for {{ $labels.application }}"
+
+      # Critical Error Rate Alert
+      - alert: CriticalErrorRate
+        expr: rate(http_requests_errors_total[5m]) / rate(http_requests_total[5m]) > 0.10
+        for: 2m
+        labels:
+          severity: critical
+          service: "{{ $labels.application }}"
+        annotations:
+          summary: "Critical error rate detected"
+          description: "Error rate is {{ $value | humanizePercentage }} for {{ $labels.application }}"
+
+      # Slow Response Time Alert
+      - alert: SlowResponseTime
+        expr: histogram_quantile(0.95, rate(http_requests_duration_bucket[5m])) > 2
+        for: 10m
+        labels:
+          severity: warning
+          service: "{{ $labels.application }}"
+        annotations:
+          summary: "Slow response time detected"
+          description: "95th percentile response time is {{ $value }}s for {{ $labels.application }}"
+
+      # Very Slow Response Time Alert
+      - alert: VerySlowResponseTime
+        expr: histogram_quantile(0.95, rate(http_requests_duration_bucket[5m])) > 5
+        for: 5m
+        labels:
+          severity: critical
+          service: "{{ $labels.application }}"
+        annotations:
+          summary: "Very slow response time detected"
+          description: "95th percentile response time is {{ $value }}s for {{ $labels.application }}"
+
+  - name: gasolinera-database-alerts
+    rules:
+      # Database Connection Pool Alert
+      - alert: DatabaseConnectionPoolHigh
+        expr: db_pool_active / db_pool_total > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          service: "{{ $labels.application }}"
+        annotations:
+          summary: "Database connection pool usage is high"
+          description: "Connection pool usage is {{ $value | humanizePercentage }} for {{ $labels.application }}"
+
+      # Database Connection Pool Critical
+      - alert: DatabaseConnectionPoolCritical
+        expr: db_pool_active / db_pool_total > 0.95
+        for: 2m
+        labels:
+          severity: critical
+          service: "{{ $labels.application }}"
+        annotations:
+          summary: "Database connection pool usage is critical"
+          description: "Connection pool usage is {{ $value | humanizePercentage }} for {{ $labels.application }}"
+
+      # Slow Database Queries Alert
+      - alert: SlowDatabaseQueries
+        expr: rate(db_queries_slow_total[5m]) > 10
+        for: 5m
+        labels:
+          severity: warning
+          service: "{{ $labels.application }}"
+        annotations:
+          summary: "High number of slow database queries"
+          description: "{{ $value }} slow queries per second for {{ $labels.application }}"
+
+      # Database Query Failures Alert
+      - alert: DatabaseQueryFailures
+        expr: rate(db_queries_failed_total[5m]) > 5
+        for: 2m
+        labels:
+          severity: critical
+          service: "{{ $labels.application }}"
+        annotations:
+          summary: "High number of database query failures"
+          description: "{{ $value }} failed queries per second for {{ $labels.application }}"
+
+  - name: gasolinera-business-alerts
+    rules:
+      # Low Coupon Usage Alert
+      - alert: LowCouponUsage
+        expr: rate(coupons_used_total[1h]) < 10
+        for: 30m
+        labels:
+          severity: warning
+          service: "coupon-service"
+        annotations:
+          summary: "Low coupon usage detected"
+          description: "Coupon usage rate is {{ $value }} per hour, which is below normal"
+
+      # High Coupon Validation Failures
+      - alert: HighCouponValidationFailures
+        expr: rate(coupons_validated_failed_total[5m]) / rate(coupons_validated_total[5m]) > 0.1
+        for: 10m
+        labels:
+          severity: warning
+          service: "coupon-service"
+        annotations:
+          summary: "High coupon validation failure rate"
+          description: "Coupon validation failure rate is {{ $value | humanizePercentage }}"
+
+      # Raffle Draw Failures Alert
+      - alert: RaffleDrawFailures
+        expr: rate(raffles_draws_failed_total[5m]) > 0
+        for: 1m
+        labels:
+          severity: critical
+          service: "raffle-service"
+        annotations:
+          summary: "Raffle draw failures detected"
+          description: "{{ $value }} raffle draw failures per second"
+
+      # Low User Registration Rate
+      - alert: LowUserRegistrationRate
+        expr: rate(users_registrations_total[1h]) < 5
+        for: 2h
+        labels:
+          severity: info
+          service: "auth-service"
+        annotations:
+          summary: "Low user registration rate"
+          description: "User registration rate is {{ $value }} per hour"
+
+      # High Authentication Failures
+      - alert: HighAuthenticationFailures
+        expr: rate(users_logins_failed_total[5m]) / rate(users_logins_total[5m]) > 0.2
+        for: 10m
+        labels:
+          severity: warning
+          service: "auth-service"
+        annotations:
+          summary: "High authentication failure rate"
+          description: "Authentication failure rate is {{ $value | humanizePercentage }}"
+
+      # Station Transaction Failures
+      - alert: StationTransactionFailures
+        expr: rate(stations_transactions_failed_total[5m]) > 1
+        for: 5m
+        labels:
+          severity: warning
+          service: "station-service"
+        annotations:
+          summary: "Station transaction failures detected"
+          description: "{{ $value }} station transaction failures per second"
+
+  - name: gasolinera-jvm-alerts
+    rules:
+      # High JVM Heap Usage
+      - alert: HighJVMHeapUsage
+        expr: jvm_memory_heap_used / jvm_memory_heap_max > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          service: "{{ $labels.application }}"
+        annotations:
+          summary: "High JVM heap usage"
+          description: "JVM heap usage is {{ $value | humanizePercentage }} for {{ $labels.application }}"
+
+      # Critical JVM Heap Usage
+      - alert: CriticalJVMHeapUsage
+        expr: jvm_memory_heap_used / jvm_memory_heap_max > 0.95
+        for: 2m
+        labels:
+          severity: critical
+          service: "{{ $labels.application }}"
+        annotations:
+          summary: "Critical JVM heap usage"
+          description: "JVM heap usage is {{ $value | humanizePercentage }} for {{ $labels.application }}"
+
+      # High GC Time
+      - alert: HighGCTime
+        expr: rate(jvm_gc_pause_sum[5m]) / rate(jvm_gc_pause_count[5m]) > 0.1
+        for: 10m
+        labels:
+          severity: warning
+          service: "{{ $labels.application }}"
+        annotations:
+          summary: "High GC time detected"
+          description: "Average GC time is {{ $value }}s for {{ $labels.application }}"
+
+      # Too Many Threads
+      - alert: TooManyThreads
+        expr: jvm_threads_live > 500
+        for: 5m
+        labels:
+          severity: warning
+          service: "{{ $labels.application }}"
+        annotations:
+          summary: "High number of JVM threads"
+          description: "{{ $value }} threads are running for {{ $labels.application }}"
+
+  - name: gasolinera-security-alerts
+    rules:
+      # Multiple Failed Login Attempts
+      - alert: MultipleFailedLogins
+        expr: increase(users_logins_failed_total[5m]) > 10
+        for: 1m
+        labels:
+          severity: warning
+          service: "auth-service"
+        annotations:
+          summary: "Multiple failed login attempts detected"
+          description: "{{ $value }} failed login attempts in the last 5 minutes"
+
+      # Suspicious Activity Pattern
+      - alert: SuspiciousActivityPattern
+        expr: rate(http_requests_total{status_code=~"4.."}[5m]) > 50
+        for: 2m
+        labels:
+          severity: warning
+          service: "{{ $labels.application }}"
+        annotations:
+          summary: "Suspicious activity pattern detected"
+          description: "High rate of 4xx errors: {{ $value }} per second for {{ $labels.application }}"
+
+      # Unauthorized Access Attempts
+      - alert: UnauthorizedAccessAttempts
+        expr: rate(http_requests_total{status_code="401"}[5m]) > 10
+        for: 5m
+        labels:
+          severity: warning
+          service: "{{ $labels.application }}"
+        annotations:
+          summary: "High number of unauthorized access attempts"
+          description: "{{ $value }} unauthorized access attempts per second for {{ $labels.application }}"

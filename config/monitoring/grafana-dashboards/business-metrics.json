@@ -1,0 +1,428 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "Gasolinera JSM - Business Metrics",
+    "tags": ["gasolinera-jsm", "business", "metrics"],
+    "style": "dark",
+    "timezone": "browser",
+    "refresh": "1m",
+    "schemaVersion": 30,
+    "version": 1,
+    "time": {
+      "from": "now-24h",
+      "to": "now"
+    },
+    "timepicker": {
+      "refresh_intervals": ["30s", "1m", "5m", "15m", "30m", "1h", "2h", "1d"]
+    },
+    "templating": {
+      "list": [
+        {
+          "name": "station",
+          "type": "query",
+          "query": "label_values(coupon_created_total, station_id)",
+          "refresh": 1,
+          "includeAll": true,
+          "allValue": ".*",
+          "multi": true,
+          "current": {
+            "selected": true,
+            "text": "All",
+            "value": "$__all"
+          }
+        },
+        {
+          "name": "fuel_type",
+          "type": "query",
+          "query": "label_values(coupon_created_total, fuel_type)",
+          "refresh": 1,
+          "includeAll": true,
+          "allValue": ".*",
+          "multi": true,
+          "current": {
+            "selected": true,
+            "text": "All",
+            "value": "$__all"
+          }
+        }
+      ]
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "Business KPIs Overview",
+        "type": "stat",
+        "gridPos": { "h": 6, "w": 24, "x": 0, "y": 0 },
+        "targets": [
+          {
+            "expr": "sum(increase(coupon_created_total[24h]))",
+            "legendFormat": "Coupons Created (24h)"
+          },
+          {
+            "expr": "sum(increase(coupon_redeemed_total[24h]))",
+            "legendFormat": "Coupons Redeemed (24h)"
+          },
+          {
+            "expr": "sum(increase(raffle_tickets_generated_total[24h]))",
+            "legendFormat": "Raffle Tickets Generated (24h)"
+          },
+          {
+            "expr": "sum(increase(user_registered_total[24h]))",
+            "legendFormat": "New Users (24h)"
+          },
+          {
+            "expr": "sum(increase(coupon_purchase_amount_total[24h]))",
+            "legendFormat": "Revenue (24h)"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": { "mode": "palette-classic" },
+            "custom": {
+              "displayMode": "basic",
+              "orientation": "horizontal"
+            },
+            "unit": "short",
+            "decimals": 0
+          },
+          "overrides": [
+            {
+              "matcher": { "id": "byName", "options": "Revenue (24h)" },
+              "properties": [
+                { "id": "unit", "value": "currencyMXN" },
+                { "id": "decimals", "value": 2 }
+              ]
+            }
+          ]
+        },
+        "options": {
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"],
+            "fields": ""
+          },
+          "orientation": "auto",
+          "textMode": "auto",
+          "colorMode": "value"
+        }
+      },
+      {
+        "id": 2,
+        "title": "Coupon Creation Rate",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 },
+        "targets": [
+          {
+            "expr": "sum(rate(coupon_created_total{station_id=~\"$station\", fuel_type=~\"$fuel_type\"}[5m])) by (fuel_type)",
+            "legendFormat": "{{fuel_type}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": { "mode": "palette-classic" },
+            "custom": {
+              "axisLabel": "Coupons/sec",
+              "axisPlacement": "auto",
+              "drawStyle": "line",
+              "fillOpacity": 10,
+              "lineWidth": 2,
+              "pointSize": 5,
+              "showPoints": "never",
+              "stacking": { "group": "A", "mode": "normal" }
+            },
+            "unit": "cps"
+          }
+        },
+        "options": {
+          "legend": {
+            "calcs": ["mean", "max"],
+            "displayMode": "table",
+            "placement": "bottom"
+          },
+          "tooltip": { "mode": "multi", "sort": "desc" }
+        }
+      },
+      {
+        "id": 3,
+        "title": "Coupon Redemption Rate",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 6 },
+        "targets": [
+          {
+            "expr": "sum(rate(coupon_redeemed_total{station_id=~\"$station\", fuel_type=~\"$fuel_type\"}[5m])) by (fuel_type)",
+            "legendFormat": "{{fuel_type}} - Redeemed"
+          },
+          {
+            "expr": "sum(rate(coupon_redemption_failed_total{station_id=~\"$station\", fuel_type=~\"$fuel_type\"}[5m])) by (fuel_type)",
+            "legendFormat": "{{fuel_type}} - Failed"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": { "mode": "palette-classic" },
+            "custom": {
+              "axisLabel": "Redemptions/sec",
+              "axisPlacement": "auto",
+              "drawStyle": "line",
+              "fillOpacity": 10,
+              "lineWidth": 2,
+              "pointSize": 5,
+              "showPoints": "never"
+            },
+            "unit": "cps"
+          }
+        }
+      },
+      {
+        "id": 4,
+        "title": "Revenue Trends",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 14 },
+        "targets": [
+          {
+            "expr": "sum(rate(coupon_purchase_amount_total{station_id=~\"$station\", fuel_type=~\"$fuel_type\"}[1h])) by (fuel_type) * 3600",
+            "legendFormat": "{{fuel_type}} - Revenue/hour"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": { "mode": "palette-classic" },
+            "custom": {
+              "axisLabel": "Revenue MXN/hour",
+              "axisPlacement": "auto",
+              "drawStyle": "line",
+              "fillOpacity": 20,
+              "lineWidth": 2,
+              "pointSize": 5,
+              "showPoints": "never",
+              "stacking": { "group": "A", "mode": "normal" }
+            },
+            "unit": "currencyMXN"
+          }
+        }
+      },
+      {
+        "id": 5,
+        "title": "Average Coupon Amount",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 14 },
+        "targets": [
+          {
+            "expr": "sum(rate(coupon_purchase_amount_total{station_id=~\"$station\", fuel_type=~\"$fuel_type\"}[5m])) by (fuel_type) / sum(rate(coupon_created_total{station_id=~\"$station\", fuel_type=~\"$fuel_type\"}[5m])) by (fuel_type)",
+            "legendFormat": "{{fuel_type}} - Avg Amount"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": { "mode": "palette-classic" },
+            "custom": {
+              "axisLabel": "Average Amount (MXN)",
+              "axisPlacement": "auto",
+              "drawStyle": "line",
+              "fillOpacity": 10,
+              "lineWidth": 2,
+              "pointSize": 5,
+              "showPoints": "never"
+            },
+            "unit": "currencyMXN"
+          }
+        }
+      },
+      {
+        "id": 6,
+        "title": "Raffle Ticket Generation",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 22 },
+        "targets": [
+          {
+            "expr": "sum(rate(raffle_tickets_generated_total{station_id=~\"$station\"}[5m])) by (source_event)",
+            "legendFormat": "{{source_event}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": { "mode": "palette-classic" },
+            "custom": {
+              "axisLabel": "Tickets/sec",
+              "axisPlacement": "auto",
+              "drawStyle": "line",
+              "fillOpacity": 10,
+              "lineWidth": 2,
+              "pointSize": 5,
+              "showPoints": "never",
+              "stacking": { "group": "A", "mode": "normal" }
+            },
+            "unit": "tps"
+          }
+        }
+      },
+      {
+        "id": 7,
+        "title": "User Registration Rate",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 22 },
+        "targets": [
+          {
+            "expr": "sum(rate(user_registered_total[5m]))",
+            "legendFormat": "New Users/sec"
+          },
+          {
+            "expr": "sum(rate(user_login_total[5m]))",
+            "legendFormat": "Logins/sec"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": { "mode": "palette-classic" },
+            "custom": {
+              "axisLabel": "Users/sec",
+              "axisPlacement": "auto",
+              "drawStyle": "line",
+              "fillOpacity": 10,
+              "lineWidth": 2,
+              "pointSize": 5,
+              "showPoints": "never"
+            },
+            "unit": "ups"
+          }
+        }
+      },
+      {
+        "id": 8,
+        "title": "Conversion Funnel",
+        "type": "bargauge",
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 30 },
+        "targets": [
+          {
+            "expr": "sum(increase(user_registered_total[24h]))",
+            "legendFormat": "Users Registered"
+          },
+          {
+            "expr": "sum(increase(coupon_created_total[24h]))",
+            "legendFormat": "Coupons Created"
+          },
+          {
+            "expr": "sum(increase(coupon_redeemed_total[24h]))",
+            "legendFormat": "Coupons Redeemed"
+          },
+          {
+            "expr": "sum(increase(raffle_participation_total[24h]))",
+            "legendFormat": "Raffle Participations"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": { "mode": "continuous-GrYlRd" },
+            "custom": {
+              "displayMode": "gradient",
+              "orientation": "horizontal"
+            },
+            "unit": "short",
+            "decimals": 0
+          }
+        },
+        "options": {
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"],
+            "fields": ""
+          },
+          "orientation": "horizontal",
+          "displayMode": "gradient"
+        }
+      },
+      {
+        "id": 9,
+        "title": "Top Performing Stations",
+        "type": "table",
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 30 },
+        "targets": [
+          {
+            "expr": "topk(10, sum(increase(coupon_redeemed_total[24h])) by (station_id))",
+            "legendFormat": "{{station_id}}",
+            "format": "table",
+            "instant": true
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "align": "auto",
+              "displayMode": "auto"
+            },
+            "unit": "short"
+          },
+          "overrides": [
+            {
+              "matcher": { "id": "byName", "options": "Value" },
+              "properties": [
+                { "id": "displayName", "value": "Redemptions (24h)" },
+                { "id": "custom.displayMode", "value": "color-background" },
+                { "id": "color", "value": { "mode": "continuous-GrYlRd" } }
+              ]
+            }
+          ]
+        },
+        "options": {
+          "showHeader": true,
+          "sortBy": [{ "desc": true, "displayName": "Redemptions (24h)" }]
+        }
+      },
+      {
+        "id": 10,
+        "title": "Success Rates",
+        "type": "stat",
+        "gridPos": { "h": 6, "w": 24, "x": 0, "y": 38 },
+        "targets": [
+          {
+            "expr": "sum(rate(coupon_redeemed_success_total[1h])) / sum(rate(coupon_redeemed_total[1h]))",
+            "legendFormat": "Coupon Redemption Success Rate"
+          },
+          {
+            "expr": "sum(rate(payment_success_total[1h])) / sum(rate(payment_total[1h]))",
+            "legendFormat": "Payment Success Rate"
+          },
+          {
+            "expr": "sum(rate(raffle_draw_success_total[1h])) / sum(rate(raffle_draw_total[1h]))",
+            "legendFormat": "Raffle Draw Success Rate"
+          },
+          {
+            "expr": "sum(rate(user_registration_success_total[1h])) / sum(rate(user_registration_total[1h]))",
+            "legendFormat": "User Registration Success Rate"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "custom": {
+              "displayMode": "gradient",
+              "orientation": "horizontal"
+            },
+            "unit": "percentunit",
+            "min": 0,
+            "max": 1,
+            "thresholds": {
+              "steps": [
+                { "color": "red", "value": 0 },
+                { "color": "yellow", "value": 0.8 },
+                { "color": "green", "value": 0.95 }
+              ]
+            }
+          }
+        },
+        "options": {
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"],
+            "fields": ""
+          },
+          "orientation": "horizontal",
+          "textMode": "auto",
+          "colorMode": "background"
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,417 @@
+{
+  "qualityGates": {
+    "name": "Gasolinera JSM Quality Gate",
+    "description": "Quality gate configuration for world-class code standards",
+    "conditions": [
+      {
+        "metric": "coverage",
+        "operator": "GREATER_THAN",
+        "threshold": "85.0",
+        "errorThreshold": "80.0",
+        "description": "Code coverage must be at least 85%"
+      },
+      {
+        "metric": "new_coverage",
+        "operator": "GREATER_THAN",
+        "threshold": "90.0",
+        "errorThreshold": "85.0",
+        "description": "New code coverage must be at least 90%"
+      },
+      {
+        "metric": "duplicated_lines_density",
+        "operator": "LESS_THAN",
+        "threshold": "3.0",
+        "errorThreshold": "5.0",
+        "description": "Duplicated lines density must be less than 3%"
+      },
+      {
+        "metric": "new_duplicated_lines_density",
+        "operator": "LESS_THAN",
+        "threshold": "2.0",
+        "errorThreshold": "3.0",
+        "description": "New duplicated lines density must be less than 2%"
+      },
+      {
+        "metric": "maintainability_rating",
+        "operator": "GREATER_THAN",
+        "threshold": "1",
+        "errorThreshold": "2",
+        "description": "Maintainability rating must be A (1)"
+      },
+      {
+        "metric": "new_maintainability_rating",
+        "operator": "GREATER_THAN",
+        "threshold": "1",
+        "errorThreshold": "1",
+        "description": "New maintainability rating must be A (1)"
+      },
+      {
+        "metric": "reliability_rating",
+        "operator": "GREATER_THAN",
+        "threshold": "1",
+        "errorThreshold": "2",
+        "description": "Reliability rating must be A (1)"
+      },
+      {
+        "metric": "new_reliability_rating",
+        "operator": "GREATER_THAN",
+        "threshold": "1",
+        "errorThreshold": "1",
+        "description": "New reliability rating must be A (1)"
+      },
+      {
+        "metric": "security_rating",
+        "operator": "GREATER_THAN",
+        "threshold": "1",
+        "errorThreshold": "2",
+        "description": "Security rating must be A (1)"
+      },
+      {
+        "metric": "new_security_rating",
+        "operator": "GREATER_THAN",
+        "threshold": "1",
+        "errorThreshold": "1",
+        "description": "New security rating must be A (1)"
+      },
+      {
+        "metric": "security_hotspots_reviewed",
+        "operator": "GREATER_THAN",
+        "threshold": "100.0",
+        "errorThreshold": "95.0",
+        "description": "All security hotspots must be reviewed"
+      },
+      {
+        "metric": "new_security_hotspots_reviewed",
+        "operator": "GREATER_THAN",
+        "threshold": "100.0",
+        "errorThreshold": "100.0",
+        "description": "All new security hotspots must be reviewed"
+      },
+      {
+        "metric": "blocker_violations",
+        "operator": "EQUALS",
+        "threshold": "0",
+        "errorThreshold": "1",
+        "description": "No blocker violations allowed"
+      },
+      {
+        "metric": "new_blocker_violations",
+        "operator": "EQUALS",
+        "threshold": "0",
+        "errorThreshold": "0",
+        "description": "No new blocker violations allowed"
+      },
+      {
+        "metric": "critical_violations",
+        "operator": "EQUALS",
+        "threshold": "0",
+        "errorThreshold": "2",
+        "description": "No critical violations allowed"
+      },
+      {
+        "metric": "new_critical_violations",
+        "operator": "EQUALS",
+        "threshold": "0",
+        "errorThreshold": "0",
+        "description": "No new critical violations allowed"
+      },
+      {
+        "metric": "major_violations",
+        "operator": "LESS_THAN",
+        "threshold": "5",
+        "errorThreshold": "10",
+        "description": "Major violations must be less than 5"
+      },
+      {
+        "metric": "new_major_violations",
+        "operator": "EQUALS",
+        "threshold": "0",
+        "errorThreshold": "1",
+        "description": "No new major violations allowed"
+      },
+      {
+        "metric": "minor_violations",
+        "operator": "LESS_THAN",
+        "threshold": "20",
+        "errorThreshold": "50",
+        "description": "Minor violations must be less than 20"
+      },
+      {
+        "metric": "new_minor_violations",
+        "operator": "LESS_THAN",
+        "threshold": "5",
+        "errorThreshold": "10",
+        "description": "New minor violations must be less than 5"
+      },
+      {
+        "metric": "info_violations",
+        "operator": "LESS_THAN",
+        "threshold": "50",
+        "errorThreshold": "100",
+        "description": "Info violations must be less than 50"
+      },
+      {
+        "metric": "cognitive_complexity",
+        "operator": "LESS_THAN",
+        "threshold": "15",
+        "errorThreshold": "20",
+        "description": "Cognitive complexity per function must be less than 15"
+      },
+      {
+        "metric": "complexity",
+        "operator": "LESS_THAN",
+        "threshold": "10",
+        "errorThreshold": "15",
+        "description": "Cyclomatic complexity per function must be less than 10"
+      },
+      {
+        "metric": "file_complexity",
+        "operator": "LESS_THAN",
+        "threshold": "200",
+        "errorThreshold": "300",
+        "description": "File complexity must be less than 200"
+      },
+      {
+        "metric": "class_complexity",
+        "operator": "LESS_THAN",
+        "threshold": "80",
+        "errorThreshold": "120",
+        "description": "Class complexity must be less than 80"
+      },
+      {
+        "metric": "function_complexity",
+        "operator": "LESS_THAN",
+        "threshold": "15",
+        "errorThreshold": "20",
+        "description": "Function complexity must be less than 15"
+      }
+    ],
+    "organizationDefaults": {
+      "sonar.qualitygate.wait": "true",
+      "sonar.coverage.exclusions": "**/config/**,**/dto/**,**/entity/**,**/exception/**,**/*Application.kt,**/*Config.kt,**/*Configuration.kt,**/*Properties.kt,**/*Request.kt,**/*Response.kt,**/*Entity.kt,**/*Dto.kt",
+      "sonar.cpd.exclusions": "**/dto/**,**/entity/**,**/config/**,**/*Request.kt,**/*Response.kt,**/*Entity.kt,**/*Dto.kt",
+      "sonar.issue.ignore.multicriteria": "e1,e2,e3,e4,e5",
+      "sonar.issue.ignore.multicriteria.e1.ruleKey": "kotlin:S1192",
+      "sonar.issue.ignore.multicriteria.e1.resourceKey": "**/*Test.kt",
+      "sonar.issue.ignore.multicriteria.e2.ruleKey": "kotlin:S100",
+      "sonar.issue.ignore.multicriteria.e2.resourceKey": "**/*Entity.kt",
+      "sonar.issue.ignore.multicriteria.e3.ruleKey": "kotlin:S1135",
+      "sonar.issue.ignore.multicriteria.e3.resourceKey": "**/*",
+      "sonar.issue.ignore.multicriteria.e4.ruleKey": "kotlin:S125",
+      "sonar.issue.ignore.multicriteria.e4.resourceKey": "**/*",
+      "sonar.issue.ignore.multicriteria.e5.ruleKey": "kotlin:S1481",
+      "sonar.issue.ignore.multicriteria.e5.resourceKey": "**/*Test.kt"
+    }
+  },
+  "technicalDebtRules": {
+    "blocker": {
+      "remediation": "immediate",
+      "maxAge": "0 days",
+      "escalation": "tech-lead"
+    },
+    "critical": {
+      "remediation": "same-day",
+      "maxAge": "1 day",
+      "escalation": "senior-developer"
+    },
+    "major": {
+      "remediation": "within-sprint",
+      "maxAge": "14 days",
+      "escalation": "team-lead"
+    },
+    "minor": {
+      "remediation": "next-sprint",
+      "maxAge": "30 days",
+      "escalation": "product-owner"
+    },
+    "info": {
+      "remediation": "backlog",
+      "maxAge": "90 days",
+      "escalation": "none"
+    }
+  },
+  "securityRules": {
+    "vulnerabilities": {
+      "critical": {
+        "action": "block-deployment",
+        "notification": "immediate",
+        "assignee": "security-team"
+      },
+      "high": {
+        "action": "require-approval",
+        "notification": "within-4h",
+        "assignee": "tech-lead"
+      },
+      "medium": {
+        "action": "create-ticket",
+        "notification": "daily-digest",
+        "assignee": "developer"
+      },
+      "low": {
+        "action": "log-only",
+        "notification": "weekly-digest",
+        "assignee": "team"
+      }
+    },
+    "hotspots": {
+      "review_priority": "high",
+      "auto_assign": true,
+      "require_justification": true,
+      "categories": [
+        "sql-injection",
+        "command-injection",
+        "path-traversal-injection",
+        "ldap-injection",
+        "header-injection",
+        "log-injection",
+        "xpath-injection",
+        "rce",
+        "dos",
+        "ssrf",
+        "csrf",
+        "xss",
+        "weak-cryptography",
+        "auth",
+        "insecure-conf",
+        "file-manipulation"
+      ]
+    }
+  },
+  "performanceThresholds": {
+    "build_time": {
+      "warning": "10 minutes",
+      "error": "15 minutes"
+    },
+    "test_execution": {
+      "warning": "5 minutes",
+      "error": "10 minutes"
+    },
+    "analysis_time": {
+      "warning": "3 minutes",
+      "error": "5 minutes"
+    }
+  },
+  "notifications": {
+    "channels": {
+      "slack": {
+        "webhook_url": "${SLACK_WEBHOOK_URL}",
+        "channels": {
+          "quality_alerts": "#gasolinera-quality",
+          "security_alerts": "#gasolinera-security",
+          "general_alerts": "#gasolinera-alerts"
+        }
+      },
+      "email": {
+        "smtp_server": "${SMTP_SERVER}",
+        "recipients": {
+          "tech_leads": ["tech-lead@gasolinera-jsm.com"],
+          "security_team": ["security@gasolinera-jsm.com"],
+          "dev_team": ["dev-team@gasolinera-jsm.com"]
+        }
+      }
+    },
+    "triggers": {
+      "quality_gate_failed": {
+        "channels": ["slack.quality_alerts", "email.tech_leads"],
+        "severity": "high"
+      },
+      "security_vulnerability_found": {
+        "channels": ["slack.security_alerts", "email.security_team"],
+        "severity": "critical"
+      },
+      "coverage_dropped": {
+        "channels": ["slack.quality_alerts"],
+        "severity": "medium",
+        "threshold": "5%"
+      },
+      "new_technical_debt": {
+        "channels": ["slack.quality_alerts"],
+        "severity": "low",
+        "threshold": "1 day"
+      }
+    }
+  },
+  "reporting": {
+    "dashboards": {
+      "quality_overview": {
+        "url": "${SONAR_HOST_URL}/dashboard?id=gasolinera-jsm-ultimate",
+        "refresh_interval": "1 hour",
+        "widgets": [
+          "coverage",
+          "duplicated_lines",
+          "maintainability_rating",
+          "reliability_rating",
+          "security_rating",
+          "technical_debt",
+          "code_smells",
+          "bugs",
+          "vulnerabilities"
+        ]
+      },
+      "security_dashboard": {
+        "url": "${SECURITY_DASHBOARD_URL}",
+        "refresh_interval": "30 minutes",
+        "widgets": [
+          "vulnerability_count",
+          "security_hotspots",
+          "dependency_vulnerabilities",
+          "security_rating_trend",
+          "remediation_effort"
+        ]
+      }
+    },
+    "exports": {
+      "daily_report": {
+        "format": "pdf",
+        "recipients": ["tech-lead@gasolinera-jsm.com"],
+        "schedule": "0 8 * * *"
+      },
+      "weekly_summary": {
+        "format": "html",
+        "recipients": ["dev-team@gasolinera-jsm.com"],
+        "schedule": "0 9 * * 1"
+      },
+      "monthly_trends": {
+        "format": "excel",
+        "recipients": ["management@gasolinera-jsm.com"],
+        "schedule": "0 10 1 * *"
+      }
+    }
+  },
+  "integrations": {
+    "jira": {
+      "enabled": true,
+      "server_url": "${JIRA_SERVER_URL}",
+      "project_key": "GASJ",
+      "auto_create_tickets": {
+        "blocker_violations": true,
+        "critical_violations": true,
+        "security_vulnerabilities": true
+      },
+      "ticket_templates": {
+        "security_vulnerability": {
+          "issue_type": "Bug",
+          "priority": "Critical",
+          "labels": ["security", "vulnerability"],
+          "components": ["Security"]
+        },
+        "quality_violation": {
+          "issue_type": "Technical Debt",
+          "priority": "Major",
+          "labels": ["quality", "technical-debt"],
+          "components": ["Code Quality"]
+        }
+      }
+    },
+    "github": {
+      "enabled": true,
+      "auto_comment_pr": true,
+      "block_merge_on_failure": true,
+      "required_checks": [
+        "code-quality",
+        "security-analysis",
+        "sonarqube-analysis"
+      ]
+    }
+  }
+}

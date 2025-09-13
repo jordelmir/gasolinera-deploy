@@ -1,0 +1,408 @@
+name: 🛡️ Quality Gates & Security Analysis
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+    types: [opened, synchronize, reopened]
+  schedule:
+    # Run security scans daily at 2 AM UTC
+    - cron: '0 2 * * *'
+
+env:
+  JAVA_VERSION: '17'
+  GRADLE_OPTS: -Dorg.gradle.daemon=false -Dorg.gradle.workers.max=2
+  SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+
+jobs:
+  # ============================================================================
+  # CODE QUALITY ANALYSIS
+  # ============================================================================
+  code-quality:
+    name: 🔍 Code Quality Analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Shallow clones should be disabled for better analysis
+
+      - name: ☕ Setup Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: 🐘 Setup Gradle
+        uses: gradle/gradle-build-action@v2
+        with:
+          gradle-version: wrapper
+
+      - name: 🔧 Make Gradlew Executable
+        run: chmod +x ./gradlew
+
+      - name: 🧹 Kotlin Lint Check
+        run: ./gradlew ktlintCheck --continue
+
+      - name: 🔍 Detekt Static Analysis
+        run: ./gradlew detekt --continue
+
+      - name: 📊 Generate Test Coverage
+        run: ./gradlew test jacocoTestReport --continue
+
+      - name: ✅ Coverage Verification
+        run: ./gradlew jacocoTestCoverageVerification
+
+      - name: 📤 Upload Coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./build/reports/jacoco/test/jacocoTestReport.xml
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: false
+
+      - name: 📋 Upload Detekt Results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: build/reports/detekt/detekt.sarif
+          category: detekt
+
+      - name: 📊 Publish Test Results
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        if: always()
+        with:
+          files: |
+            **/build/test-results/test/TEST-*.xml
+            **/build/test-results/integrationTest/TEST-*.xml
+
+  # ============================================================================
+  # SONARQUBE ANALYSIS
+  # ============================================================================
+  sonarqube-analysis:
+    name: 📊 SonarQube Analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: code-quality
+    if: github.event_name != 'schedule'
+
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: ☕ Setup Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: 🔧 Make Gradlew Executable
+        run: chmod +x ./gradlew
+
+      - name: 🧪 Run Tests for Coverage
+        run: ./gradlew test jacocoTestReport
+
+      - name: 🔍 Run Detekt for SonarQube
+        run: ./gradlew detekt
+
+      - name: 📊 SonarQube Analysis
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            ./gradlew sonarqube \
+              -Dsonar.pullrequest.key=${{ github.event.number }} \
+              -Dsonar.pullrequest.branch=${{ github.head_ref }} \
+              -Dsonar.pullrequest.base=${{ github.base_ref }}
+          else
+            ./gradlew sonarqube \
+              -Dsonar.branch.name=${{ github.ref_name }}
+          fi
+
+      - name: 🚪 SonarQube Quality Gate Check
+        uses: sonarqube-quality-gate-action@master
+        timeout-minutes: 5
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          scanMetadataReportFile: build/sonar/report-task.txt
+
+  # ============================================================================
+  # SECURITY VULNERABILITY ANALYSIS
+  # ============================================================================
+  security-analysis:
+    name: 🔒 Security Vulnerability Analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: ☕ Setup Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: 🔧 Make Gradlew Executable
+        run: chmod +x ./gradlew
+
+      - name: 🛡️ OWASP Dependency Check
+        env:
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+        run: ./gradlew dependencyCheckAnalyze --info
+
+      - name: 📤 Upload OWASP Report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: owasp-dependency-check-report
+          path: |
+            **/build/reports/dependency-check-report.html
+            **/build/reports/dependency-check-report.xml
+            **/build/reports/dependency-check-report.json
+          retention-days: 30
+
+      - name: 📋 Upload OWASP SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: build/reports/dependency-check-report.sarif
+          category: owasp-dependency-check
+
+  # ============================================================================
+  # CODEQL SECURITY ANALYSIS
+  # ============================================================================
+  codeql-analysis:
+    name: 🔍 CodeQL Security Analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language: ['java']
+
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 🔍 Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          queries: +security-and-quality
+
+      - name: ☕ Setup Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: 🔧 Make Gradlew Executable
+        run: chmod +x ./gradlew
+
+      - name: 🏗️ Build Application
+        run: ./gradlew build -x test -x detekt -x ktlintCheck
+
+      - name: 🔍 Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: '/language:${{matrix.language}}'
+
+  # ============================================================================
+  # DEPENDENCY REVIEW (PR only)
+  # ============================================================================
+  dependency-review:
+    name: 🔍 Dependency Review
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 🔍 Dependency Review
+        uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: moderate
+          allow-licenses: Apache-2.0, MIT, BSD-2-Clause, BSD-3-Clause, ISC, GPL-3.0
+          deny-licenses: GPL-2.0, LGPL-2.0, LGPL-2.1, LGPL-3.0
+          comment-summary-in-pr: true
+
+  # ============================================================================
+  # QUALITY GATE AGGREGATION
+  # ============================================================================
+  quality-gate:
+    name: 🚪 Quality Gate
+    runs-on: ubuntu-latest
+    needs:
+      [code-quality, sonarqube-analysis, security-analysis, codeql-analysis]
+    if: always() && github.event_name != 'schedule'
+
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: ✅ Check Quality Gate Status
+        run: |
+          echo "=== QUALITY GATE RESULTS ==="
+          echo "Code Quality: ${{ needs.code-quality.result }}"
+          echo "SonarQube Analysis: ${{ needs.sonarqube-analysis.result }}"
+          echo "Security Analysis: ${{ needs.security-analysis.result }}"
+          echo "CodeQL Analysis: ${{ needs.codeql-analysis.result }}"
+
+          # Check if any critical job failed
+          if [[ "${{ needs.code-quality.result }}" == "failure" ]]; then
+            echo "❌ Code quality checks failed"
+            exit 1
+          fi
+
+          if [[ "${{ needs.sonarqube-analysis.result }}" == "failure" ]]; then
+            echo "❌ SonarQube quality gate failed"
+            exit 1
+          fi
+
+          if [[ "${{ needs.security-analysis.result }}" == "failure" ]]; then
+            echo "❌ Security vulnerability checks failed"
+            exit 1
+          fi
+
+          if [[ "${{ needs.codeql-analysis.result }}" == "failure" ]]; then
+            echo "❌ CodeQL security analysis failed"
+            exit 1
+          fi
+
+          echo "✅ All quality gates passed!"
+
+      - name: 📊 Generate Quality Report
+        if: always()
+        run: |
+          cat > quality-report.md << EOF
+          # 📊 Quality Gate Report
+
+          ## 🎯 Summary
+          - **Build**: ${{ github.run_number }}
+          - **Commit**: ${{ github.sha }}
+          - **Branch**: ${{ github.ref_name }}
+          - **Triggered by**: ${{ github.event_name }}
+
+          ## 📋 Results
+          | Check | Status | Details |
+          |-------|--------|---------|
+          | Code Quality | ${{ needs.code-quality.result == 'success' && '✅ Passed' || '❌ Failed' }} | Lint, Detekt, Coverage |
+          | SonarQube | ${{ needs.sonarqube-analysis.result == 'success' && '✅ Passed' || '❌ Failed' }} | Quality Gate |
+          | Security Scan | ${{ needs.security-analysis.result == 'success' && '✅ Passed' || '❌ Failed' }} | OWASP Dependencies |
+          | CodeQL | ${{ needs.codeql-analysis.result == 'success' && '✅ Passed' || '❌ Failed' }} | Security Analysis |
+
+          ## 🔗 Links
+          - [SonarQube Dashboard](https://sonarcloud.io/project/overview?id=gasolinera-jsm-ultimate)
+          - [Security Advisories](https://github.com/${{ github.repository }}/security/advisories)
+          - [Dependency Graph](https://github.com/${{ github.repository }}/network/dependencies)
+          EOF
+
+          cat quality-report.md
+
+      - name: 📤 Upload Quality Report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: quality-gate-report
+          path: quality-report.md
+          retention-days: 30
+
+  # ============================================================================
+  # SECURITY NOTIFICATIONS (Scheduled runs)
+  # ============================================================================
+  security-notifications:
+    name: 🚨 Security Notifications
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule'
+    needs: [security-analysis, codeql-analysis]
+
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 🚨 Check Security Status
+        run: |
+          echo "=== DAILY SECURITY SCAN RESULTS ==="
+          echo "Security Analysis: ${{ needs.security-analysis.result }}"
+          echo "CodeQL Analysis: ${{ needs.codeql-analysis.result }}"
+
+          if [[ "${{ needs.security-analysis.result }}" == "failure" || "${{ needs.codeql-analysis.result }}" == "failure" ]]; then
+            echo "⚠️ Security vulnerabilities detected in daily scan"
+            echo "Please review the security reports and take appropriate action"
+            # Here you could add Slack notification or email alert
+          else
+            echo "✅ No new security vulnerabilities detected"
+          fi
+
+  # ============================================================================
+  # PERFORMANCE IMPACT ANALYSIS (PR only)
+  # ============================================================================
+  performance-impact:
+    name: ⚡ Performance Impact Analysis
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    timeout-minutes: 15
+
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: ☕ Setup Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: 🔧 Make Gradlew Executable
+        run: chmod +x ./gradlew
+
+      - name: ⚡ Run Performance Tests
+        run: |
+          # Run JMH benchmarks if they exist
+          if [ -d "performance-tests" ]; then
+            ./gradlew :performance-tests:jmh || echo "Performance tests not available"
+          fi
+
+      - name: 📊 Analyze Build Performance
+        run: |
+          echo "=== BUILD PERFORMANCE ANALYSIS ==="
+
+          # Measure build time
+          start_time=$(date +%s)
+          ./gradlew build -x test --build-cache --parallel
+          end_time=$(date +%s)
+          build_duration=$((end_time - start_time))
+
+          echo "Build Duration: ${build_duration}s"
+
+          # Check if build time is reasonable (< 5 minutes)
+          if [ $build_duration -gt 300 ]; then
+            echo "⚠️ Build time exceeded 5 minutes threshold"
+            echo "Consider optimizing build performance"
+          else
+            echo "✅ Build performance is acceptable"
+          fi

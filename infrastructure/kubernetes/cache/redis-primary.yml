@@ -1,0 +1,227 @@
+# Redis Primary Cache Deployment for Kubernetes
+# High-performance primary cache with persistence and monitoring
+
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: redis-primary
+  namespace: gasolinera-jsm
+  labels:
+    app.kubernetes.io/name: redis-primary
+    app.kubernetes.io/component: cache
+    app.kubernetes.io/part-of: gasolinera-jsm-platform
+    app.kubernetes.io/version: "7.2"
+spec:
+  serviceName: redis-primary-headless
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: redis-primary
+      app.kubernetes.io/component: cache
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: redis-primary
+        app.kubernetes.io/component: cache
+        app.kubernetes.io/part-of: gasolinera-jsm-platform
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9121"
+        prometheus.io/path: "/metrics"
+    spec:
+      securityContext:
+        fsGroup: 999
+        runAsUser: 999
+        runAsNonRoot: true
+      initContainers:
+      - name: redis-init
+        image: redis:7.2-alpine
+        command:
+        - /bin/sh
+        - -c
+        - |
+          set -e
+          echo "Initializing Redis configuration..."
+
+          # Create Redis data directory with proper permissions
+          mkdir -p /data
+          chown -R 999:999 /data
+
+          # Copy configuration files
+          cp /etc/redis-config/redis.conf /data/redis.conf
+          chown 999:999 /data/redis.conf
+
+          echo "Redis initialization completed"
+        volumeMounts:
+        - name: redis-data
+          mountPath: /data
+        - name: redis-config
+          mountPath: /etc/redis-config
+        securityContext:
+          runAsUser: 0  # Need root for chown
+        resources:
+          requests:
+            memory: 64Mi
+            cpu: 50m
+          limits:
+            memory: 128Mi
+            cpu: 100m
+      containers:
+      - name: redis
+        image: redis:7.2-alpine
+        ports:
+        - containerPort: 6379
+          name: redis
+        env:
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: redis-credentials
+              key: REDIS_PASSWORD
+        command:
+        - redis-server
+        - /data/redis.conf
+        - --requirepass
+        - $(REDIS_PASSWORD)
+        volumeMounts:
+        - name: redis-data
+          mountPath: /data
+        livenessProbe:
+          exec:
+            command:
+            - redis-cli
+            - --no-auth-warning
+            - -a
+            - $(REDIS_PASSWORD)
+            - ping
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          exec:
+            command:
+            - redis-cli
+            - --no-auth-warning
+            - -a
+            - $(REDIS_PASSWORD)
+            - ping
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        resources:
+          requests:
+            memory: 512Mi
+            cpu: 250m
+          limits:
+            memory: 1Gi
+            cpu: 1
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: false
+          runAsNonRoot: true
+          runAsUser: 999
+          capabilities:
+            drop:
+            - ALL
+      # Redis Exporter for Prometheus metrics
+      - name: redis-exporter
+        image: oliver006/redis_exporter:v1.55.0
+        ports:
+        - containerPort: 9121
+          name: metrics
+        env:
+        - name: REDIS_ADDR
+          value: "redis://localhost:6379"
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: redis-credentials
+              key: REDIS_PASSWORD
+        - name: REDIS_EXPORTER_INCL_SYSTEM_METRICS
+          value: "true"
+        - name: REDIS_EXPORTER_CHECK_KEYS
+          value: "gasolinera:*,session:*,cache:*"
+        resources:
+          requests:
+            memory: 64Mi
+            cpu: 50m
+          limits:
+            memory: 128Mi
+            cpu: 100m
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 65534
+          capabilities:
+            drop:
+            - ALL
+      volumes:
+      - name: redis-config
+        configMap:
+          name: redis-config
+  volumeClaimTemplates:
+  - metadata:
+      name: redis-data
+      labels:
+        app.kubernetes.io/name: redis-primary
+        app.kubernetes.io/component: cache
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      storageClassName: gasolinera-ssd-fast
+      resources:
+        requests:
+          storage: 20Gi
+---
+# Redis Primary Headless Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-primary-headless
+  namespace: gasolinera-jsm
+  labels:
+    app.kubernetes.io/name: redis-primary
+    app.kubernetes.io/component: cache
+    app.kubernetes.io/part-of: gasolinera-jsm-platform
+spec:
+  type: ClusterIP
+  clusterIP: None
+  ports:
+  - port: 6379
+    targetPort: 6379
+    protocol: TCP
+    name: redis
+  selector:
+    app.kubernetes.io/name: redis-primary
+    app.kubernetes.io/component: cache
+---
+# Redis Primary Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-primary
+  namespace: gasolinera-jsm
+  labels:
+    app.kubernetes.io/name: redis-primary
+    app.kubernetes.io/component: cache
+    app.kubernetes.io/part-of: gasolinera-jsm-platform
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9121"
+    prometheus.io/path: "/metrics"
+spec:
+  type: ClusterIP
+  ports:
+  - port: 6379
+    targetPort: 6379
+    protocol: TCP
+    name: redis
+  - port: 9121
+    targetPort: 9121
+    protocol: TCP
+    name: metrics
+  selector:
+    app.kubernetes.io/name: redis-primary
+    app.kubernetes.io/component: cache

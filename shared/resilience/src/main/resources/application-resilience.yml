@@ -1,0 +1,372 @@
+gasolinera:
+  resilience:
+    enabled: true
+
+    # Configuración de Circuit Breakers
+    circuit-breakers:
+      database:
+        failure-rate-threshold: 60.0
+        wait-duration-in-open-state: 30s
+        sliding-window-size: 50
+        minimum-number-of-calls: 5
+        permitted-number-of-calls-in-half-open-state: 3
+        slow-call-rate-threshold: 100.0
+        slow-call-duration-threshold: 2s
+        record-exceptions:
+          - java.sql.SQLException
+          - org.springframework.dao.DataAccessException
+        ignore-exceptions:
+          - java.lang.IllegalArgumentException
+
+      redis:
+        failure-rate-threshold: 70.0
+        wait-duration-in-open-state: 20s
+        sliding-window-size: 30
+        minimum-number-of-calls: 3
+        permitted-number-of-calls-in-half-open-state: 2
+        slow-call-rate-threshold: 100.0
+        slow-call-duration-threshold: 1s
+        record-exceptions:
+          - redis.clients.jedis.exceptions.JedisException
+          - org.springframework.data.redis.RedisConnectionFailureException
+
+      external-service:
+        failure-rate-threshold: 50.0
+        wait-duration-in-open-state: 60s
+        sliding-window-size: 100
+        minimum-number-of-calls: 10
+        permitted-number-of-calls-in-half-open-state: 5
+        slow-call-rate-threshold: 100.0
+        slow-call-duration-threshold: 5s
+        record-exceptions:
+          - java.net.ConnectException
+          - java.net.SocketTimeoutException
+          - org.springframework.web.client.ResourceAccessException
+
+      payment-gateway:
+        failure-rate-threshold: 30.0
+        wait-duration-in-open-state: 120s
+        sliding-window-size: 200
+        minimum-number-of-calls: 20
+        permitted-number-of-calls-in-half-open-state: 10
+        slow-call-rate-threshold: 100.0
+        slow-call-duration-threshold: 10s
+        record-exceptions:
+          - java.net.ConnectException
+          - java.net.SocketTimeoutException
+
+      notification-service:
+        failure-rate-threshold: 80.0
+        wait-duration-in-open-state: 30s
+        sliding-window-size: 50
+        minimum-number-of-calls: 5
+        permitted-number-of-calls-in-half-open-state: 3
+        slow-call-rate-threshold: 100.0
+        slow-call-duration-threshold: 3s
+
+    # Configuración de Retry
+    retries:
+      database:
+        max-attempts: 3
+        wait-duration: 100ms
+        interval-function: EXPONENTIAL_BACKOFF
+        exponential-backoff-multiplier: 2.0
+        randomization-factor: 0.5
+        retry-exceptions:
+          - java.sql.SQLException
+          - org.springframework.dao.TransientDataAccessException
+        ignore-exceptions:
+          - java.lang.IllegalArgumentException
+
+      redis:
+        max-attempts: 2
+        wait-duration: 50ms
+        interval-function: FIXED
+        retry-exceptions:
+          - redis.clients.jedis.exceptions.JedisConnectionException
+
+      external-service:
+        max-attempts: 3
+        wait-duration: 500ms
+        interval-function: EXPONENTIAL_RANDOM_BACKOFF
+        exponential-backoff-multiplier: 2.0
+        randomization-factor: 0.5
+        retry-exceptions:
+          - java.net.ConnectException
+          - java.net.SocketTimeoutException
+
+      payment-gateway:
+        max-attempts: 5
+        wait-duration: 1s
+        interval-function: EXPONENTIAL_BACKOFF
+        exponential-backoff-multiplier: 1.5
+        retry-exceptions:
+          - java.net.ConnectException
+          - java.net.SocketTimeoutException
+
+      business-operation:
+        max-attempts: 2
+        wait-duration: 200ms
+        interval-function: FIXED
+        retry-exceptions:
+          - java.lang.RuntimeException
+
+    # Configuración de Bulkhead
+    bulkheads:
+      database:
+        max-concurrent-calls: 50
+        max-wait-duration: 100ms
+
+      redis:
+        max-concurrent-calls: 100
+        max-wait-duration: 50ms
+
+      external-service:
+        max-concurrent-calls: 20
+        max-wait-duration: 500ms
+
+      payment-gateway:
+        max-concurrent-calls: 10
+        max-wait-duration: 1s
+
+      business-operation:
+        max-concurrent-calls: 30
+        max-wait-duration: 200ms
+
+    # Configuración de Rate Limiter
+    rate-limiters:
+      api-calls:
+        limit-for-period: 100
+        limit-refresh-period: 1s
+        timeout-duration: 100ms
+
+      database-calls:
+        limit-for-period: 200
+        limit-refresh-period: 1s
+        timeout-duration: 50ms
+
+      external-service-calls:
+        limit-for-period: 50
+        limit-refresh-period: 1s
+        timeout-duration: 500ms
+
+      payment-gateway-calls:
+        limit-for-period: 20
+        limit-refresh-period: 1s
+        timeout-duration: 1s
+
+    # Configuración de Time Limiter
+    time-limiters:
+      database:
+        timeout-duration: 5s
+        cancel-running-future: true
+
+      redis:
+        timeout-duration: 2s
+        cancel-running-future: true
+
+      external-service:
+        timeout-duration: 10s
+        cancel-running-future: true
+
+      payment-gateway:
+        timeout-duration: 30s
+        cancel-running-future: false
+
+      business-operation:
+        timeout-duration: 15s
+        cancel-running-future: true
+
+    # Configuración de Fallbacks
+    fallbacks:
+      enabled: true
+      cache-enabled: true
+      cache-ttl: 5m
+      default-responses:
+        coupon-generation: 'Servicio temporalmente no disponible'
+        user-authentication: 'Autenticación temporalmente no disponible'
+        station-lookup: 'Información de estaciones no disponible'
+
+# Configuración de Resilience4j
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        registerHealthIndicator: true
+        slidingWindowSize: 100
+        minimumNumberOfCalls: 10
+        permittedNumberOfCallsInHalfOpenState: 3
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+        waitDurationInOpenState: 60s
+        failureRateThreshold: 50
+        eventConsumerBufferSize: 10
+        recordExceptions:
+          - java.lang.Exception
+        ignoreExceptions:
+          - java.lang.IllegalArgumentException
+    instances:
+      database:
+        baseConfig: default
+        failureRateThreshold: 60
+        waitDurationInOpenState: 30s
+        slidingWindowSize: 50
+        minimumNumberOfCalls: 5
+      redis:
+        baseConfig: default
+        failureRateThreshold: 70
+        waitDurationInOpenState: 20s
+        slidingWindowSize: 30
+        minimumNumberOfCalls: 3
+      external-service:
+        baseConfig: default
+        failureRateThreshold: 50
+        waitDurationInOpenState: 60s
+      payment-gateway:
+        baseConfig: default
+        failureRateThreshold: 30
+        waitDurationInOpenState: 120s
+        slidingWindowSize: 200
+        minimumNumberOfCalls: 20
+      notification-service:
+        baseConfig: default
+        failureRateThreshold: 80
+        waitDurationInOpenState: 30s
+        slidingWindowSize: 50
+        minimumNumberOfCalls: 5
+
+  retry:
+    configs:
+      default:
+        maxAttempts: 3
+        waitDuration: 500ms
+        enableExponentialBackoff: true
+        exponentialBackoffMultiplier: 2
+        enableRandomizedWait: false
+        randomizedWaitFactor: 0.5
+        retryExceptions:
+          - java.lang.Exception
+        ignoreExceptions:
+          - java.lang.IllegalArgumentException
+    instances:
+      database:
+        baseConfig: default
+        maxAttempts: 3
+        waitDuration: 100ms
+      redis:
+        baseConfig: default
+        maxAttempts: 2
+        waitDuration: 50ms
+        enableExponentialBackoff: false
+      external-service:
+        baseConfig: default
+        maxAttempts: 3
+        waitDuration: 500ms
+        enableRandomizedWait: true
+      payment-gateway:
+        baseConfig: default
+        maxAttempts: 5
+        waitDuration: 1s
+        exponentialBackoffMultiplier: 1.5
+      business-operation:
+        baseConfig: default
+        maxAttempts: 2
+        waitDuration: 200ms
+        enableExponentialBackoff: false
+
+  bulkhead:
+    configs:
+      default:
+        maxConcurrentCalls: 25
+        maxWaitDuration: 0ms
+    instances:
+      database:
+        baseConfig: default
+        maxConcurrentCalls: 50
+        maxWaitDuration: 100ms
+      redis:
+        baseConfig: default
+        maxConcurrentCalls: 100
+        maxWaitDuration: 50ms
+      external-service:
+        baseConfig: default
+        maxConcurrentCalls: 20
+        maxWaitDuration: 500ms
+      payment-gateway:
+        baseConfig: default
+        maxConcurrentCalls: 10
+        maxWaitDuration: 1s
+      business-operation:
+        baseConfig: default
+        maxConcurrentCalls: 30
+        maxWaitDuration: 200ms
+
+  ratelimiter:
+    configs:
+      default:
+        limitForPeriod: 50
+        limitRefreshPeriod: 1s
+        timeoutDuration: 500ms
+        registerHealthIndicator: true
+        eventConsumerBufferSize: 100
+    instances:
+      api-calls:
+        baseConfig: default
+        limitForPeriod: 100
+        timeoutDuration: 100ms
+      database-calls:
+        baseConfig: default
+        limitForPeriod: 200
+        timeoutDuration: 50ms
+      external-service-calls:
+        baseConfig: default
+        limitForPeriod: 50
+        timeoutDuration: 500ms
+      payment-gateway-calls:
+        baseConfig: default
+        limitForPeriod: 20
+        timeoutDuration: 1s
+
+  timelimiter:
+    configs:
+      default:
+        timeoutDuration: 3s
+        cancelRunningFuture: true
+    instances:
+      database:
+        baseConfig: default
+        timeoutDuration: 5s
+      redis:
+        baseConfig: default
+        timeoutDuration: 2s
+      external-service:
+        baseConfig: default
+        timeoutDuration: 10s
+      payment-gateway:
+        baseConfig: default
+        timeoutDuration: 30s
+        cancelRunningFuture: false
+      business-operation:
+        baseConfig: default
+        timeoutDuration: 15s
+
+# Configuración de métricas
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus,circuitbreakers,retries,bulkheads,ratelimiters
+  endpoint:
+    health:
+      show-details: always
+    metrics:
+      enabled: true
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+    distribution:
+      percentiles-histogram:
+        resilience4j.circuitbreaker.calls: true
+        resilience4j.retry.calls: true
+        resilience4j.bulkhead.calls: true
+        resilience4j.ratelimiter.calls: true

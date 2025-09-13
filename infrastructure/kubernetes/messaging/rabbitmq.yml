@@ -1,0 +1,272 @@
+# RabbitMQ Messaging System Deployment for Kubernetes
+# High-availability message broker with clustering support
+
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: rabbitmq
+  namespace: gasolinera-jsm
+  labels:
+    app.kubernetes.io/name: rabbitmq
+    app.kubernetes.io/component: messaging
+    app.kubernetes.io/part-of: gasolinera-jsm-platform
+    app.kubernetes.io/version: "3.12"
+spec:
+  serviceName: rabbitmq-headless
+  replicas: 3
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: rabbitmq
+      app.kubernetes.io/component: messaging
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: rabbitmq
+        app.kubernetes.io/component: messaging
+        app.kubernetes.io/part-of: gasolinera-jsm-platform
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "15692"
+        prometheus.io/path: "/metrics"
+    spec:
+      securityContext:
+        fsGroup: 999
+        runAsUser: 999
+        runAsNonRoot: true
+      serviceAccountName: rabbitmq
+      initContainers:
+      - name: rabbitmq-init
+        image: rabbitmq:3.12-management-alpine
+        command:
+        - /bin/bash
+        - -c
+        - |
+          set -e
+          echo "Initializing RabbitMQ configuration..."
+
+          # Create RabbitMQ data directory
+          mkdir -p /var/lib/rabbitmq/mnesia
+          chown -R 999:999 /var/lib/rabbitmq
+
+          # Copy configuration files
+          cp /etc/rabbitmq-config/rabbitmq.conf /var/lib/rabbitmq/rabbitmq.conf
+          cp /etc/rabbitmq-config/enabled_plugins /var/lib/rabbitmq/enabled_plugins
+
+          # Set proper permissions
+          chown 999:999 /var/lib/rabbitmq/rabbitmq.conf
+          chown 999:999 /var/lib/rabbitmq/enabled_plugins
+
+          echo "RabbitMQ initialization completed"
+        volumeMounts:
+        - name: rabbitmq-data
+          mountPath: /var/lib/rabbitmq
+        - name: rabbitmq-config
+          mountPath: /etc/rabbitmq-config
+        securityContext:
+          runAsUser: 0  # Need root for chown
+        resources:
+          requests:
+            memory: 128Mi
+            cpu: 100m
+          limits:
+            memory: 256Mi
+            cpu: 200m
+      containers:
+      - name: rabbitmq
+        image: rabbitmq:3.12-management-alpine
+        ports:
+        - containerPort: 5672
+          name: amqp
+        - containerPort: 15672
+          name: management
+        - containerPort: 15692
+          name: prometheus
+        - containerPort: 25672
+          name: clustering
+        env:
+        - name: RABBITMQ_DEFAULT_USER
+          valueFrom:
+            secretKeyRef:
+              name: rabbitmq-credentials
+              key: RABBITMQ_DEFAULT_USER
+        - name: RABBITMQ_DEFAULT_PASS
+          valueFrom:
+            secretKeyRef:
+              name: rabbitmq-credentials
+              key: RABBITMQ_DEFAULT_PASS
+        - name: RABBITMQ_ERLANG_COOKIE
+          valueFrom:
+            secretKeyRef:
+              name: rabbitmq-credentials
+              key: RABBITMQ_ERLANG_COOKIE
+        - name: RABBITMQ_USE_LONGNAME
+          value: "true"
+        - name: RABBITMQ_NODENAME
+          value: "rabbit@$(hostname -f)"
+        - name: K8S_SERVICE_NAME
+          value: "rabbitmq-headless"
+        - name: RABBITMQ_CONFIG_FILE
+          value: "/var/lib/rabbitmq/rabbitmq"
+        - name: RABBITMQ_ENABLED_PLUGINS_FILE
+          value: "/var/lib/rabbitmq/enabled_plugins"
+        volumeMounts:
+        - name: rabbitmq-data
+          mountPath: /var/lib/rabbitmq
+        - name: rabbitmq-config
+          mountPath: /etc/rabbitmq
+        livenessProbe:
+          exec:
+            command:
+            - rabbitmq-diagnostics
+            - -q
+            - ping
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          exec:
+            command:
+            - rabbitmq-diagnostics
+            - -q
+            - check_port_connectivity
+          initialDelaySeconds: 20
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        resources:
+          requests:
+            memory: 1Gi
+            cpu: 500m
+          limits:
+            memory: 2Gi
+            cpu: 1
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: false
+          runAsNonRoot: true
+          runAsUser: 999
+          capabilities:
+            drop:
+            - ALL
+      volumes:
+      - name: rabbitmq-config
+        configMap:
+          name: rabbitmq-config
+  volumeClaimTemplates:
+  - metadata:
+      name: rabbitmq-data
+      labels:
+        app.kubernetes.io/name: rabbitmq
+        app.kubernetes.io/component: messaging
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      storageClassName: gasolinera-standard
+      resources:
+        requests:
+          storage: 50Gi
+---
+# RabbitMQ Service Account
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: rabbitmq
+  namespace: gasolinera-jsm
+  labels:
+    app.kubernetes.io/name: rabbitmq
+    app.kubernetes.io/component: messaging
+    app.kubernetes.io/part-of: gasolinera-jsm-platform
+---
+# RabbitMQ Role for Kubernetes API access
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: rabbitmq
+  namespace: gasolinera-jsm
+  labels:
+    app.kubernetes.io/name: rabbitmq
+    app.kubernetes.io/component: messaging
+rules:
+- apiGroups: [""]
+  resources: ["endpoints"]
+  verbs: ["get"]
+- apiGroups: [""]
+  resources: ["events"]
+  verbs: ["create"]
+---
+# RabbitMQ RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: rabbitmq
+  namespace: gasolinera-jsm
+  labels:
+    app.kubernetes.io/name: rabbitmq
+    app.kubernetes.io/component: messaging
+subjects:
+- kind: ServiceAccount
+  name: rabbitmq
+  namespace: gasolinera-jsm
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: rabbitmq
+---
+# RabbitMQ Headless Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: rabbitmq-headless
+  namespace: gasolinera-jsm
+  labels:
+    app.kubernetes.io/name: rabbitmq
+    app.kubernetes.io/component: messaging
+    app.kubernetes.io/part-of: gasolinera-jsm-platform
+spec:
+  type: ClusterIP
+  clusterIP: None
+  ports:
+  - port: 5672
+    targetPort: 5672
+    protocol: TCP
+    name: amqp
+  - port: 25672
+    targetPort: 25672
+    protocol: TCP
+    name: clustering
+  selector:
+    app.kubernetes.io/name: rabbitmq
+    app.kubernetes.io/component: messaging
+---
+# RabbitMQ Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: rabbitmq
+  namespace: gasolinera-jsm
+  labels:
+    app.kubernetes.io/name: rabbitmq
+    app.kubernetes.io/component: messaging
+    app.kubernetes.io/part-of: gasolinera-jsm-platform
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "15692"
+    prometheus.io/path: "/metrics"
+spec:
+  type: ClusterIP
+  ports:
+  - port: 5672
+    targetPort: 5672
+    protocol: TCP
+    name: amqp
+  - port: 15672
+    targetPort: 15672
+    protocol: TCP
+    name: management
+  - port: 15692
+    targetPort: 15692
+    protocol: TCP
+    name: prometheus
+  selector:
+    app.kubernetes.io/name: rabbitmq
+    app.kubernetes.io/component: messaging

@@ -1,0 +1,276 @@
+# Docker Compose override for optimized builds
+# Use this file for building with optimized Dockerfiles and caching
+
+version: '3.8'
+
+services:
+  # Infrastructure services (unchanged)
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: gasolinera_jsm
+      POSTGRES_USER: gasolinera_user
+      POSTGRES_PASSWORD: gasolinera_pass
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init:/docker-entrypoint-initdb.d
+    ports:
+      - '5432:5432'
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U gasolinera_user -d gasolinera_jsm']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: gasolinera_user
+      RABBITMQ_DEFAULT_PASS: gasolinera_pass
+    ports:
+      - '5672:5672'
+      - '15672:15672'
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ['CMD', 'rabbitmq-diagnostics', 'ping']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Application services with optimized builds
+  api-gateway:
+    build:
+      context: .
+      dockerfile: services/api-gateway/Dockerfile
+      cache_from:
+        - gasolinera-jsm/api-gateway:cache
+      args:
+        BUILDKIT_INLINE_CACHE: 1
+    image: gasolinera-jsm/api-gateway:latest
+    container_name: gasolinera-api-gateway
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    ports:
+      - '8080:8080'
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/gasolinera_jsm
+      - SPRING_DATASOURCE_USERNAME=gasolinera_user
+      - SPRING_DATASOURCE_PASSWORD=gasolinera_pass
+      - SPRING_REDIS_HOST=redis
+      - SPRING_RABBITMQ_HOST=rabbitmq
+      - SPRING_RABBITMQ_USERNAME=gasolinera_user
+      - SPRING_RABBITMQ_PASSWORD=gasolinera_pass
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:8080/actuator/health']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  auth-service:
+    build:
+      context: .
+      dockerfile: services/auth-service/Dockerfile
+      cache_from:
+        - gasolinera-jsm/auth-service:cache
+      args:
+        BUILDKIT_INLINE_CACHE: 1
+    image: gasolinera-jsm/auth-service:latest
+    container_name: gasolinera-auth-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    ports:
+      - '8081:8080'
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/gasolinera_jsm
+      - SPRING_DATASOURCE_USERNAME=gasolinera_user
+      - SPRING_DATASOURCE_PASSWORD=gasolinera_pass
+      - SPRING_REDIS_HOST=redis
+      - SPRING_RABBITMQ_HOST=rabbitmq
+      - SPRING_RABBITMQ_USERNAME=gasolinera_user
+      - SPRING_RABBITMQ_PASSWORD=gasolinera_pass
+
+  coupon-service:
+    build:
+      context: .
+      dockerfile: services/coupon-service/Dockerfile
+      cache_from:
+        - gasolinera-jsm/coupon-service:cache
+      args:
+        BUILDKIT_INLINE_CACHE: 1
+    image: gasolinera-jsm/coupon-service:latest
+    container_name: gasolinera-coupon-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    ports:
+      - '8082:8080'
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/gasolinera_jsm
+      - SPRING_DATASOURCE_USERNAME=gasolinera_user
+      - SPRING_DATASOURCE_PASSWORD=gasolinera_pass
+      - SPRING_REDIS_HOST=redis
+      - SPRING_RABBITMQ_HOST=rabbitmq
+      - SPRING_RABBITMQ_USERNAME=gasolinera_user
+      - SPRING_RABBITMQ_PASSWORD=gasolinera_pass
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:8080/actuator/health']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  station-service:
+    build:
+      context: .
+      dockerfile: services/station-service/Dockerfile
+      cache_from:
+        - gasolinera-jsm/station-service:cache
+      args:
+        BUILDKIT_INLINE_CACHE: 1
+    image: gasolinera-jsm/station-service:latest
+    container_name: gasolinera-station-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    ports:
+      - '8083:8080'
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/gasolinera_jsm
+      - SPRING_DATASOURCE_USERNAME=gasolinera_user
+      - SPRING_DATASOURCE_PASSWORD=gasolinera_pass
+      - SPRING_REDIS_HOST=redis
+      - SPRING_RABBITMQ_HOST=rabbitmq
+      - SPRING_RABBITMQ_USERNAME=gasolinera_user
+      - SPRING_RABBITMQ_PASSWORD=gasolinera_pass
+
+  raffle-service:
+    build:
+      context: .
+      dockerfile: services/raffle-service/Dockerfile
+      cache_from:
+        - gasolinera-jsm/raffle-service:cache
+      args:
+        BUILDKIT_INLINE_CACHE: 1
+    image: gasolinera-jsm/raffle-service:latest
+    container_name: gasolinera-raffle-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    ports:
+      - '8084:8080'
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/gasolinera_jsm
+      - SPRING_DATASOURCE_USERNAME=gasolinera_user
+      - SPRING_DATASOURCE_PASSWORD=gasolinera_pass
+      - SPRING_REDIS_HOST=redis
+      - SPRING_RABBITMQ_HOST=rabbitmq
+      - SPRING_RABBITMQ_USERNAME=gasolinera_user
+      - SPRING_RABBITMQ_PASSWORD=gasolinera_pass
+
+  redemption-service:
+    build:
+      context: .
+      dockerfile: services/redemption-service/Dockerfile
+      cache_from:
+        - gasolinera-jsm/redemption-service:cache
+      args:
+        BUILDKIT_INLINE_CACHE: 1
+    image: gasolinera-jsm/redemption-service:latest
+    container_name: gasolinera-redemption-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    ports:
+      - '8085:8080'
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/gasolinera_jsm
+      - SPRING_DATASOURCE_USERNAME=gasolinera_user
+      - SPRING_DATASOURCE_PASSWORD=gasolinera_pass
+      - SPRING_REDIS_HOST=redis
+      - SPRING_RABBITMQ_HOST=rabbitmq
+      - SPRING_RABBITMQ_USERNAME=gasolinera_user
+      - SPRING_RABBITMQ_PASSWORD=gasolinera_pass
+
+  ad-engine:
+    build:
+      context: .
+      dockerfile: services/ad-engine/Dockerfile
+      cache_from:
+        - gasolinera-jsm/ad-engine:cache
+      args:
+        BUILDKIT_INLINE_CACHE: 1
+    image: gasolinera-jsm/ad-engine:latest
+    container_name: gasolinera-ad-engine
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    ports:
+      - '8086:8080'
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/gasolinera_jsm
+      - SPRING_DATASOURCE_USERNAME=gasolinera_user
+      - SPRING_DATASOURCE_PASSWORD=gasolinera_pass
+      - SPRING_REDIS_HOST=redis
+      - SPRING_RABBITMQ_HOST=rabbitmq
+      - SPRING_RABBITMQ_USERNAME=gasolinera_user
+      - SPRING_RABBITMQ_PASSWORD=gasolinera_pass
+
+volumes:
+  postgres_data:
+  redis_data:
+  rabbitmq_data:
+
+networks:
+  default:
+    name: gasolinera-network

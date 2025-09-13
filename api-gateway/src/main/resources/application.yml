@@ -1,0 +1,198 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: api-gateway
+  profiles:
+    include:
+      - resilience
+      - vault
+      - monitoring
+      - logging
+      - tracing
+      - health
+
+  cloud:
+    gateway:
+      default-filters:
+        - DedupeResponseHeader=Access-Control-Allow-Credentials Access-Control-Allow-Origin
+        - AddRequestHeader=X-Gateway-Request-Id, ${random.uuid}
+        - AddRequestHeader=X-Gateway-Timestamp, ${T(java.time.Instant).now().toString()}
+
+      globalcors:
+        cors-configurations:
+          '[/**]':
+            allowedOriginPatterns: '*'
+            allowedMethods:
+              - GET
+              - POST
+              - PUT
+              - DELETE
+              - OPTIONS
+              - PATCH
+            allowedHeaders: '*'
+            allowCredentials: true
+            exposedHeaders:
+              - Authorization
+              - X-Total-Count
+              - X-Correlation-ID
+            maxAge: 3600
+
+      routes:
+        # Auth Service
+        - id: auth-service
+          uri: http://auth-service:8081
+          predicates:
+            - Path=/api/auth/**
+          filters:
+            - StripPrefix=2
+            - CircuitBreaker=auth-service
+            - name: Retry
+              args:
+                retries: 3
+                statuses: BAD_GATEWAY,GATEWAY_TIMEOUT
+                methods: GET,POST
+                backoff:
+                  firstBackoff: 50ms
+                  maxBackoff: 500ms
+
+        # Station Service
+        - id: station-service
+          uri: http://station-service:8082
+          predicates:
+            - Path=/api/stations/**
+          filters:
+            - StripPrefix=2
+            - CircuitBreaker=external-service
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 100
+                redis-rate-limiter.burstCapacity: 200
+
+        # Coupon Service
+        - id: coupon-service
+          uri: http://coupon-service:8083
+          predicates:
+            - Path=/api/coupons/**, /api/campaigns/**
+          filters:
+            - StripPrefix=2
+            - CircuitBreaker=external-service
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 50
+                redis-rate-limiter.burstCapacity: 100
+
+        # Redemption Service
+        - id: redemption-service
+          uri: http://redemption-service:8084
+          predicates:
+            - Path=/api/redemptions/**, /api/raffle-tickets/**
+          filters:
+            - StripPrefix=2
+            - CircuitBreaker=external-service
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 75
+                redis-rate-limiter.burstCapacity: 150
+
+        # Ad Engine
+        - id: ad-engine
+          uri: http://ad-engine:8085
+          predicates:
+            - Path=/api/ads/**, /api/engagements/**
+          filters:
+            - StripPrefix=2
+            - CircuitBreaker=external-service
+
+        # Raffle Service
+        - id: raffle-service
+          uri: http://raffle-service:8086
+          predicates:
+            - Path=/api/raffles/**
+          filters:
+            - StripPrefix=2
+            - CircuitBreaker=external-service
+
+        # Health Aggregation
+        - id: health-aggregation
+          uri: http://health-service:8090
+          predicates:
+            - Path=/api/health/**
+          filters:
+            - StripPrefix=2
+
+        # Metrics Aggregation
+        - id: metrics-aggregation
+          uri: http://monitoring-service:8091
+          predicates:
+            - Path=/api/metrics/**
+          filters:
+            - StripPrefix=2
+
+# JWT Configuration
+gasolinera:
+  jwt:
+    secret-key: ${VAULT_JWT_SECRET:gasolinera-jsm-default-secret-key-change-in-production}
+    expiration: PT24H
+    refresh-expiration: P7D
+    issuer: gasolinera-jsm
+    audience: gasolinera-jsm-users
+    clock-skew: PT5M
+    public-paths:
+      - '/api/auth/login'
+      - '/api/auth/register'
+      - '/api/auth/refresh'
+      - '/api/health/**'
+      - '/actuator/**'
+      - '/swagger-ui/**'
+      - '/v3/api-docs/**'
+      - '/webjars/**'
+    admin-paths:
+      - '/api/admin/**'
+      - '/api/management/**'
+      - '/api/metrics/**'
+    moderator-paths:
+      - '/api/stations/*/manage'
+      - '/api/campaigns/*/manage'
+      - '/api/raffles/*/manage'
+
+# Management and Monitoring
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus,gateway
+  endpoint:
+    health:
+      show-details: always
+    gateway:
+      enabled: true
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+    distribution:
+      percentiles-histogram:
+        spring.cloud.gateway.requests: true
+
+# Logging
+logging:
+  level:
+    org.springframework.cloud.gateway: DEBUG
+    com.gasolinerajsm: DEBUG
+    org.springframework.security: DEBUG
+  pattern:
+    console: '%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level [%X{correlationId}] %logger{36} - %msg%n'
+
+# Redis Configuration for Rate Limiting
+spring.redis:
+  host: ${REDIS_HOST:localhost}
+  port: ${REDIS_PORT:6379}
+  password: ${REDIS_PASSWORD:}
+  timeout: 2000ms
+  lettuce:
+    pool:
+      max-active: 8
+      max-idle: 8
+      min-idle: 0

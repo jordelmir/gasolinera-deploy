@@ -80,7 +80,6 @@ interface AdSequenceRepository : JpaRepository<AdSequence, String> {
         AND s.rewardClaimed = false
     """)
     fun findSequencesWithPendingRewards(): List<AdSequence>
-}
 
     /**
      * Count sequences by status
@@ -91,3 +90,4 @@ interface AdSequenceRepository : JpaRepository<AdSequence, String> {
      * Find sequences by user and status
      */
     fun findByUserIdAndStatus(userId: String, status: String): List<AdSequence>
+}

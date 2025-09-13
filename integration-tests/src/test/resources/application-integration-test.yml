@@ -1,0 +1,147 @@
+# Integration Test Configuration
+spring:
+  profiles:
+    active: integration-test
+
+  # Database configuration (will be overridden by TestContainers)
+  datasource:
+    url: jdbc:postgresql://localhost:5432/gasolinera_test_db
+    username: test_user
+    password: test_password
+    driver-class-name: org.postgresql.Driver
+
+  # JPA Configuration
+  jpa:
+    hibernate:
+      ddl-auto: none
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: false
+
+  # Flyway Configuration
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    validate-on-migrate: true
+
+  # RabbitMQ Configuration (will be overridden by TestContainers)
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: test_user
+    password: test_password
+    virtual-host: test_vhost
+
+  # Redis Configuration (will be overridden by TestContainers)
+  redis:
+    host: localhost
+    port: 6379
+    password: test_password
+    timeout: 2000ms
+    lettuce:
+      pool:
+        max-active: 8
+        max-idle: 8
+        min-idle: 0
+
+# Logging Configuration
+logging:
+  level:
+    com.gasolinerajsm: DEBUG
+    org.springframework.web: INFO
+    org.springframework.security: INFO
+    org.testcontainers: INFO
+    org.flywaydb: INFO
+  pattern:
+    console: '%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n'
+
+# Management endpoints
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
+
+# Test-specific configuration
+test:
+  timeout:
+    default: 30s
+    long: 120s
+
+  services:
+    auth-service:
+      base-url: http://localhost:8081
+      timeout: 30s
+
+    station-service:
+      base-url: http://localhost:8082
+      timeout: 30s
+
+    coupon-service:
+      base-url: http://localhost:8083
+      timeout: 30s
+
+    redemption-service:
+      base-url: http://localhost:8084
+      timeout: 30s
+
+    ad-engine:
+      base-url: http://localhost:8085
+      timeout: 30s
+
+    raffle-service:
+      base-url: http://localhost:8086
+      timeout: 30s
+
+    api-gateway:
+      base-url: http://localhost:8080
+      timeout: 30s
+
+  data:
+    # Test user credentials
+    test-users:
+      admin:
+        phone: '+525555000001'
+        otp: '123456'
+
+      station-admin:
+        phone: '+525555000002'
+        otp: '123456'
+
+      employee:
+        phone: '+525555000005'
+        otp: '123456'
+
+      customer:
+        phone: '+525555001001'
+        otp: '123456'
+
+    # Test station data
+    test-stations:
+      primary:
+        id: 1
+        code: 'JSM001'
+        name: 'Gasolinera JSM Centro'
+
+      secondary:
+        id: 2
+        code: 'JSM002'
+        name: 'Gasolinera JSM Polanco'
+
+    # Test campaign data
+    test-campaigns:
+      welcome:
+        id: 1
+        code: 'WELCOME2024'
+        name: 'Bienvenida Nuevos Clientes'
+
+      summer:
+        id: 2
+        code: 'SUMMER2024'
+        name: 'Verano JSM 2024'

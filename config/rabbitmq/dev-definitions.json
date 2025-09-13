@@ -1,0 +1,216 @@
+{
+  "rabbit_version": "3.12.0",
+  "rabbitmq_version": "3.12.0",
+  "product_name": "RabbitMQ",
+  "product_version": "3.12.0",
+  "users": [
+    {
+      "name": "gasolinera_dev",
+      "password_hash": "gAAAAABhZ2V0X2hhc2g=",
+      "hashing_algorithm": "rabbit_password_hashing_sha256",
+      "tags": "administrator"
+    }
+  ],
+  "vhosts": [
+    {
+      "name": "gasolinera_dev_vhost"
+    }
+  ],
+  "permissions": [
+    {
+      "user": "gasolinera_dev",
+      "vhost": "gasolinera_dev_vhost",
+      "configure": ".*",
+      "write": ".*",
+      "read": ".*"
+    }
+  ],
+  "topic_permissions": [],
+  "parameters": [],
+  "global_parameters": [
+    {
+      "name": "cluster_name",
+      "value": "gasolinera-dev-cluster"
+    }
+  ],
+  "policies": [
+    {
+      "vhost": "gasolinera_dev_vhost",
+      "name": "dev-ha-policy",
+      "pattern": ".*",
+      "apply-to": "all",
+      "definition": {
+        "ha-mode": "all",
+        "ha-sync-mode": "automatic",
+        "message-ttl": 3600000
+      },
+      "priority": 0
+    }
+  ],
+  "queues": [
+    {
+      "name": "coupon.events",
+      "vhost": "gasolinera_dev_vhost",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-message-ttl": 3600000,
+        "x-max-length": 10000,
+        "x-overflow": "reject-publish"
+      }
+    },
+    {
+      "name": "redemption.events",
+      "vhost": "gasolinera_dev_vhost",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-message-ttl": 3600000,
+        "x-max-length": 10000,
+        "x-overflow": "reject-publish"
+      }
+    },
+    {
+      "name": "raffle.events",
+      "vhost": "gasolinera_dev_vhost",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-message-ttl": 3600000,
+        "x-max-length": 10000,
+        "x-overflow": "reject-publish"
+      }
+    },
+    {
+      "name": "user.events",
+      "vhost": "gasolinera_dev_vhost",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-message-ttl": 3600000,
+        "x-max-length": 10000,
+        "x-overflow": "reject-publish"
+      }
+    },
+    {
+      "name": "notification.events",
+      "vhost": "gasolinera_dev_vhost",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-message-ttl": 1800000,
+        "x-max-length": 5000,
+        "x-overflow": "reject-publish"
+      }
+    },
+    {
+      "name": "audit.events",
+      "vhost": "gasolinera_dev_vhost",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-message-ttl": 7200000,
+        "x-max-length": 50000,
+        "x-overflow": "drop-head"
+      }
+    },
+    {
+      "name": "dead-letter-queue",
+      "vhost": "gasolinera_dev_vhost",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-message-ttl": 86400000,
+        "x-max-length": 1000,
+        "x-overflow": "drop-head"
+      }
+    }
+  ],
+  "exchanges": [
+    {
+      "name": "gasolinera.events",
+      "vhost": "gasolinera_dev_vhost",
+      "type": "topic",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "gasolinera.notifications",
+      "vhost": "gasolinera_dev_vhost",
+      "type": "fanout",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "gasolinera.dead-letter",
+      "vhost": "gasolinera_dev_vhost",
+      "type": "direct",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    }
+  ],
+  "bindings": [
+    {
+      "source": "gasolinera.events",
+      "vhost": "gasolinera_dev_vhost",
+      "destination": "coupon.events",
+      "destination_type": "queue",
+      "routing_key": "coupon.*",
+      "arguments": {}
+    },
+    {
+      "source": "gasolinera.events",
+      "vhost": "gasolinera_dev_vhost",
+      "destination": "redemption.events",
+      "destination_type": "queue",
+      "routing_key": "redemption.*",
+      "arguments": {}
+    },
+    {
+      "source": "gasolinera.events",
+      "vhost": "gasolinera_dev_vhost",
+      "destination": "raffle.events",
+      "destination_type": "queue",
+      "routing_key": "raffle.*",
+      "arguments": {}
+    },
+    {
+      "source": "gasolinera.events",
+      "vhost": "gasolinera_dev_vhost",
+      "destination": "user.events",
+      "destination_type": "queue",
+      "routing_key": "user.*",
+      "arguments": {}
+    },
+    {
+      "source": "gasolinera.events",
+      "vhost": "gasolinera_dev_vhost",
+      "destination": "audit.events",
+      "destination_type": "queue",
+      "routing_key": "audit.*",
+      "arguments": {}
+    },
+    {
+      "source": "gasolinera.notifications",
+      "vhost": "gasolinera_dev_vhost",
+      "destination": "notification.events",
+      "destination_type": "queue",
+      "routing_key": "",
+      "arguments": {}
+    },
+    {
+      "source": "gasolinera.dead-letter",
+      "vhost": "gasolinera_dev_vhost",
+      "destination": "dead-letter-queue",
+      "destination_type": "queue",
+      "routing_key": "failed",
+      "arguments": {}
+    }
+  ]
+}

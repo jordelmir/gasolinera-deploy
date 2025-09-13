@@ -1,47 +1,236 @@
 server:
-  port: 8082
+  port: 8083
+  servlet:
+    context-path: /
 
 spring:
   application:
     name: redemption-service
+
   datasource:
-    url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5432}/${POSTGRES_DB:puntog}
-    username: ${POSTGRES_USER:puntog}
-    password: ${POSTGRES_PASSWORD:changeme}
+    url: jdbc:postgresql://localhost:5432/gasolinera_redemption
+    username: ${DB_USERNAME:gasolinera_user}
+    password: ${DB_PASSWORD:gasolinera_pass}
     driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      idle-timeout: 300000
+      connection-timeout: 20000
+      leak-detection-threshold: 60000
+
   jpa:
     hibernate:
       ddl-auto: validate
+    show-sql: false
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+        use_sql_comments: true
+        jdbc:
+          batch_size: 20
+        order_inserts: true
+        order_updates: true
+    open-in-view: false
+
   flyway:
     enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    validate-on-migrate: true
+    schemas: redemption_schema
+
   rabbitmq:
     host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:gasolinera_user}
+    password: ${RABBITMQ_PASSWORD:gasolinera_pass}
+    virtual-host: ${RABBITMQ_VHOST:/gasolinera}
+    connection-timeout: 60000
+    publisher-confirm-type: correlated
+    publisher-returns: true
+    template:
+      mandatory: true
+      receive-timeout: 5000
+      reply-timeout: 5000
+
   redis:
     host: ${REDIS_HOST:localhost}
+    port: ${REDIS_PORT:6379}
+    password: ${REDIS_PASSWORD:}
+    database: 3
+    timeout: 2000ms
+    lettuce:
+      pool:
+        max-active: 8
+        max-idle: 8
+        min-idle: 0
+        max-wait: -1ms
 
-  cloud:
-    vault:
-      enabled: true
-      scheme: http
-      host: localhost
-      port: 8200
-      authentication: TOKEN
-      token: ${VAULT_TOKEN:myroottoken}
-      kv:
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+    deserialization:
+      fail-on-unknown-properties: false
+    default-property-inclusion: non_null
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${JWT_ISSUER_URI:http://localhost:8080/auth/realms/gasolinera}
+          jwk-set-uri: ${JWT_JWK_SET_URI:http://localhost:8080/auth/realms/gasolinera/protocol/openid-connect/certs}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    export:
+      prometheus:
         enabled: true
-        backend: secret
-        profile-separator: /
-        default-context: application
-        application-name: ${spring.application.name}
+  tracing:
+    sampling:
+      probability: 1.0
+
+logging:
+  level:
+    com.gasolinerajsm.redemptionservice: INFO
+    org.springframework.security: DEBUG
+    org.springframework.web: INFO
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+    org.springframework.amqp: INFO
+  pattern:
+    console: '%d{yyyy-MM-dd HH:mm:ss} - %msg%n'
+    file: '%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n'
+  file:
+    name: logs/redemption-service.log
+
+# Custom application properties
+app:
+  name: Gasolinera JSM Redemption Service
+  version: 1.0.0
+  description: Service for managing coupon redemptions and raffle tickets
+
+  security:
+    jwt:
+      secret: ${JWT_SECRET:your-secret-key}
+      expiration: 86400000 # 24 hours
+
+  fraud-detection:
+    enabled: true
+    high-value-threshold: 500.00
+    max-daily-redemptions: 20
+    max-hourly-redemptions: 5
+
+  raffle-tickets:
+    default-expiration-days: 90
+    max-tickets-per-redemption: 10
+
+  external-services:
+    coupon-service:
+      url: ${COUPON_SERVICE_URL:http://localhost:8081}
+      timeout: 5000
+    station-service:
+      url: ${STATION_SERVICE_URL:http://localhost:8082}
+      timeout: 5000
+    auth-service:
+      url: ${AUTH_SERVICE_URL:http://localhost:8080}
+      timeout: 5000
+
+  messaging:
+    exchanges:
+      redemption: redemption.exchange
+    routing-keys:
+      redemption-created: redemption.created
+      redemption-completed: redemption.completed
+      redemption-voided: redemption.voided
+      redemption-expired: redemption.expired
+      tickets-generated: raffle.tickets.generated
+
+  cache:
+    ttl:
+      user-balance: 300 # 5 minutes
+      redemption-stats: 600 # 10 minutes
+      fraud-scores: 1800 # 30 minutes
+
+# Actuator info
+info:
+  app:
+    name: ${app.name}
+    version: ${app.version}
+    description: ${app.description}
+  java:
+    version: ${java.version}
+  spring:
+    version: ${spring-boot.version}
+
+---
+spring:
+  config:
+    activate:
+      on-profile: docker
+
+  datasource:
+    url: jdbc:postgresql://postgres:5432/gasolinera_redemption
+
+  rabbitmq:
+    host: rabbitmq
+
+  redis:
+    host: redis
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://vault:8200/auth/realms/gasolinera
+          jwk-set-uri: http://vault:8200/auth/realms/gasolinera/protocol/openid-connect/certs
 
 app:
-  qr:
-    secret: ${QR_SIGNATURE_SECRET}
-  geofence-radius-meters: ${GEOfENCE_RADIUS_METERS:50}
+  external-services:
+    coupon-service:
+      url: http://coupon-service:8081
+    station-service:
+      url: http://station-service:8082
+    auth-service:
+      url: http://auth-service:8080
 
-# --- OpenTelemetry Tracing Configuration ---
-management.tracing.sampling.probability=1.0
-management.otlp.tracing.endpoint=http://jaeger:4318/v1/traces
+---
+spring:
+  config:
+    activate:
+      on-profile: test
+
+  datasource:
+    url: jdbc:h2:mem:testdb
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    database-platform: org.hibernate.dialect.H2Dialect
+
+  flyway:
+    enabled: false
+
+  rabbitmq:
+    host: localhost
+    port: 5672
+
+  redis:
+    host: localhost
+    port: 6379
+
+logging:
+  level:
+    com.gasolinerajsm.redemptionservice: DEBUG
+    org.springframework.test: INFO

@@ -1,0 +1,52 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: gasolinera-jsm
+  labels:
+    name: gasolinera-jsm
+    environment: production
+    project: gasolinera-jsm-ultimate
+    managed-by: kubernetes
+  annotations:
+    description: "Gasolinera JSM Production Namespace"
+    contact: "devops@gasolinera.com"
+    version: "1.0.0"
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: gasolinera-jsm-quota
+  namespace: gasolinera-jsm
+spec:
+  hard:
+    requests.cpu: "20"
+    requests.memory: 40Gi
+    limits.cpu: "40"
+    limits.memory: 80Gi
+    persistentvolumeclaims: "20"
+    services: "20"
+    secrets: "50"
+    configmaps: "50"
+    pods: "100"
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: gasolinera-jsm-limits
+  namespace: gasolinera-jsm
+spec:
+  limits:
+  - default:
+      cpu: "1"
+      memory: "1Gi"
+    defaultRequest:
+      cpu: "100m"
+      memory: "128Mi"
+    type: Container
+  - max:
+      cpu: "4"
+      memory: "8Gi"
+    min:
+      cpu: "50m"
+      memory: "64Mi"
+    type: Container

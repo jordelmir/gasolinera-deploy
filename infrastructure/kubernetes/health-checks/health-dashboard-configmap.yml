@@ -1,0 +1,293 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: health-dashboard-config
+  namespace: gasolinera-jsm
+  labels:
+    app: health-dashboard
+data:
+  dashboard.json: |
+    {
+      "dashboard": {
+        "id": null,
+        "title": "Gasolinera JSM - Health Checks Dashboard",
+        "tags": ["gasolinera", "health", "monitoring"],
+        "style": "dark",
+        "timezone": "browser",
+        "refresh": "30s",
+        "time": {
+          "from": "now-1h",
+          "to": "now"
+        },
+        "panels": [
+          {
+            "id": 1,
+            "title": "Overall System Health",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "up{job=~\"gasolinera-.*\"}",
+                "legendFormat": "{{instance}}"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "color": {
+                  "mode": "thresholds"
+                },
+                "thresholds": {
+                  "steps": [
+                    {"color": "red", "value": 0},
+                    {"color": "green", "value": 1}
+                  ]
+                }
+              }
+            },
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0}
+          },
+          {
+            "id": 2,
+            "title": "Service Availability",
+            "type": "table",
+            "targets": [
+              {
+                "expr": "avg_over_time(up{job=~\"gasolinera-.*\"}[1h])",
+                "legendFormat": "{{job}}"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0}
+          },
+          {
+            "id": 3,
+            "title": "Database Health",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "gasolinera_database_health_status",
+                "legendFormat": "Database Status"
+              },
+              {
+                "expr": "gasolinera_database_connection_pool_usage",
+                "legendFormat": "Connection Pool Usage %"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 8, "x": 0, "y": 8}
+          },
+          {
+            "id": 4,
+            "title": "Redis Health",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "gasolinera_redis_health_status",
+                "legendFormat": "Redis Status"
+              },
+              {
+                "expr": "gasolinera_redis_memory_usage_percentage",
+                "legendFormat": "Memory Usage %"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 8, "x": 8, "y": 8}
+          },
+          {
+            "id": 5,
+            "title": "System Resources",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "gasolinera_system_cpu_usage_percentage",
+                "legendFormat": "CPU Usage %"
+              },
+              {
+                "expr": "gasolinera_system_memory_usage_percentage",
+                "legendFormat": "Memory Usage %"
+              },
+              {
+                "expr": "gasolinera_system_disk_usage_percentage",
+                "legendFormat": "Disk Usage %"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 8, "x": 16, "y": 8}
+          },
+          {
+            "id": 6,
+            "title": "Business Operations Health",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "rate(gasolinera_business_operations_total[5m])",
+                "legendFormat": "{{operation_type}} - Rate"
+              },
+              {
+                "expr": "gasolinera_business_operations_success_rate",
+                "legendFormat": "{{operation_type}} - Success Rate"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16}
+          },
+          {
+            "id": 7,
+            "title": "External Services Health",
+            "type": "table",
+            "targets": [
+              {
+                "expr": "gasolinera_external_service_health_status",
+                "legendFormat": "{{service_name}}"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16}
+          },
+          {
+            "id": 8,
+            "title": "Health Check Response Times",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "histogram_quantile(0.95, gasolinera_health_check_duration_seconds_bucket)",
+                "legendFormat": "95th percentile"
+              },
+              {
+                "expr": "histogram_quantile(0.50, gasolinera_health_check_duration_seconds_bucket)",
+                "legendFormat": "50th percentile"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 24, "x": 0, "y": 24}
+          }
+        ]
+      }
+    }
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: health-alerts-config
+  namespace: gasolinera-jsm
+  labels:
+    app: health-monitoring
+data:
+  alerts.yml: |
+    groups:
+    - name: gasolinera-health-checks
+      rules:
+
+      # Service Down Alert
+      - alert: GasolineraServiceDown
+        expr: up{job=~"gasolinera-.*"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: "{{ $labels.job }}"
+        annotations:
+          summary: "Gasolinera service {{ $labels.job }} is down"
+          description: "Service {{ $labels.job }} has been down for more than 1 minute"
+
+      # Database Health Alert
+      - alert: GasolineraDatabaseUnhealthy
+        expr: gasolinera_database_health_status == 0
+        for: 30s
+        labels:
+          severity: critical
+          component: database
+        annotations:
+          summary: "Gasolinera database is unhealthy"
+          description: "Database health check is failing"
+
+      # High Database Connection Pool Usage
+      - alert: GasolineraDatabaseHighConnectionUsage
+        expr: gasolinera_database_connection_pool_usage > 80
+        for: 2m
+        labels:
+          severity: warning
+          component: database
+        annotations:
+          summary: "High database connection pool usage"
+          description: "Database connection pool usage is {{ $value }}%"
+
+      # Redis Health Alert
+      - alert: GasolineraRedisUnhealthy
+        expr: gasolinera_redis_health_status == 0
+        for: 30s
+        labels:
+          severity: critical
+          component: redis
+        annotations:
+          summary: "Gasolinera Redis is unhealthy"
+          description: "Redis health check is failing"
+
+      # High Redis Memory Usage
+      - alert: GasolineraRedisHighMemoryUsage
+        expr: gasolinera_redis_memory_usage_percentage > 85
+        for: 5m
+        labels:
+          severity: warning
+          component: redis
+        annotations:
+          summary: "High Redis memory usage"
+          description: "Redis memory usage is {{ $value }}%"
+
+      # High System CPU Usage
+      - alert: GasolineraHighCpuUsage
+        expr: gasolinera_system_cpu_usage_percentage > 80
+        for: 5m
+        labels:
+          severity: warning
+          component: system
+        annotations:
+          summary: "High CPU usage on {{ $labels.instance }}"
+          description: "CPU usage is {{ $value }}%"
+
+      # High System Memory Usage
+      - alert: GasolineraHighMemoryUsage
+        expr: gasolinera_system_memory_usage_percentage > 85
+        for: 5m
+        labels:
+          severity: warning
+          component: system
+        annotations:
+          summary: "High memory usage on {{ $labels.instance }}"
+          description: "Memory usage is {{ $value }}%"
+
+      # High System Disk Usage
+      - alert: GasolineraHighDiskUsage
+        expr: gasolinera_system_disk_usage_percentage > 90
+        for: 2m
+        labels:
+          severity: critical
+          component: system
+        annotations:
+          summary: "High disk usage on {{ $labels.instance }}"
+          description: "Disk usage is {{ $value }}%"
+
+      # Business Operations High Error Rate
+      - alert: GasolineraBusinessOperationHighErrorRate
+        expr: gasolinera_business_operations_error_rate > 0.05
+        for: 3m
+        labels:
+          severity: warning
+          component: business
+        annotations:
+          summary: "High error rate for {{ $labels.operation_type }}"
+          description: "Error rate for {{ $labels.operation_type }} is {{ $value }}"
+
+      # External Service Down
+      - alert: GasolineraExternalServiceDown
+        expr: gasolinera_external_service_health_status == 0
+        for: 1m
+        labels:
+          severity: warning
+          component: external
+        annotations:
+          summary: "External service {{ $labels.service_name }} is down"
+          description: "External service {{ $labels.service_name }} health check is failing"
+
+      # Health Check Taking Too Long
+      - alert: GasolineraHealthCheckSlow
+        expr: histogram_quantile(0.95, gasolinera_health_check_duration_seconds_bucket) > 5
+        for: 2m
+        labels:
+          severity: warning
+          component: health-check
+        annotations:
+          summary: "Health checks are taking too long"
+          description: "95th percentile of health check duration is {{ $value }}s"

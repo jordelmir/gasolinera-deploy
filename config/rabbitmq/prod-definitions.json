@@ -1,0 +1,386 @@
+{
+  "rabbit_version": "3.12.0",
+  "rabbitmq_version": "3.12.0",
+  "product_name": "RabbitMQ",
+  "product_version": "3.12.0",
+  "users": [
+    {
+      "name": "gasolinera_admin",
+      "password_hash": "PLACEHOLDER_ADMIN_PASSWORD_HASH",
+      "hashing_algorithm": "rabbit_password_hashing_sha256",
+      "tags": "administrator"
+    },
+    {
+      "name": "gasolinera_service",
+      "password_hash": "PLACEHOLDER_SERVICE_PASSWORD_HASH",
+      "hashing_algorithm": "rabbit_password_hashing_sha256",
+      "tags": "management"
+    },
+    {
+      "name": "gasolinera_monitoring",
+      "password_hash": "PLACEHOLDER_MONITORING_PASSWORD_HASH",
+      "hashing_algorithm": "rabbit_password_hashing_sha256",
+      "tags": "monitoring"
+    }
+  ],
+  "vhosts": [
+    {
+      "name": "gasolinera_vhost"
+    }
+  ],
+  "permissions": [
+    {
+      "user": "gasolinera_admin",
+      "vhost": "gasolinera_vhost",
+      "configure": ".*",
+      "write": ".*",
+      "read": ".*"
+    },
+    {
+      "user": "gasolinera_service",
+      "vhost": "gasolinera_vhost",
+      "configure": "^(gasolinera\\.|amq\\.gen.*)",
+      "write": "^(gasolinera\\.|amq\\.gen.*)",
+      "read": "^(gasolinera\\.|amq\\.gen.*)"
+    },
+    {
+      "user": "gasolinera_monitoring",
+      "vhost": "gasolinera_vhost",
+      "configure": "",
+      "write": "",
+      "read": ".*"
+    }
+  ],
+  "topic_permissions": [],
+  "parameters": [
+    {
+      "vhost": "gasolinera_vhost",
+      "component": "federation-upstream",
+      "name": "backup-cluster",
+      "value": {
+        "uri": "amqp://backup-rabbitmq:5672/gasolinera_vhost",
+        "expires": 3600000,
+        "message-ttl": 3600000,
+        "max-hops": 1,
+        "prefetch-count": 1000,
+        "reconnect-delay": 5,
+        "ack-mode": "on-confirm",
+        "trust-user-id": false
+      }
+    }
+  ],
+  "global_parameters": [
+    {
+      "name": "cluster_name",
+      "value": "gasolinera-prod-cluster"
+    },
+    {
+      "name": "internal_cluster_id",
+      "value": "gasolinera-prod-internal"
+    }
+  ],
+  "policies": [
+    {
+      "vhost": "gasolinera_vhost",
+      "name": "ha-all-policy",
+      "pattern": "^gasolinera\\.",
+      "apply-to": "all",
+      "definition": {
+        "ha-mode": "all",
+        "ha-sync-mode": "automatic",
+        "ha-sync-batch-size": 1000,
+        "message-ttl": 86400000,
+        "max-length": 100000,
+        "overflow": "reject-publish",
+        "dead-letter-exchange": "gasolinera.dead-letter",
+        "dead-letter-routing-key": "failed"
+      },
+      "priority": 10
+    },
+    {
+      "vhost": "gasolinera_vhost",
+      "name": "lazy-queue-policy",
+      "pattern": "^gasolinera\\.(audit|logs)\\.",
+      "apply-to": "queues",
+      "definition": {
+        "queue-mode": "lazy",
+        "ha-mode": "all",
+        "message-ttl": 604800000,
+        "max-length": 1000000,
+        "overflow": "drop-head"
+      },
+      "priority": 20
+    },
+    {
+      "vhost": "gasolinera_vhost",
+      "name": "priority-queue-policy",
+      "pattern": "^gasolinera\\.(critical|alerts)\\.",
+      "apply-to": "queues",
+      "definition": {
+        "max-priority": 10,
+        "ha-mode": "all",
+        "ha-sync-mode": "automatic",
+        "message-ttl": 3600000
+      },
+      "priority": 30
+    }
+  ],
+  "queues": [
+    {
+      "name": "gasolinera.coupon.events",
+      "vhost": "gasolinera_vhost",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-message-ttl": 86400000,
+        "x-max-length": 100000,
+        "x-overflow": "reject-publish",
+        "x-dead-letter-exchange": "gasolinera.dead-letter",
+        "x-dead-letter-routing-key": "coupon.failed"
+      }
+    },
+    {
+      "name": "gasolinera.redemption.events",
+      "vhost": "gasolinera_vhost",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-message-ttl": 86400000,
+        "x-max-length": 100000,
+        "x-overflow": "reject-publish",
+        "x-dead-letter-exchange": "gasolinera.dead-letter",
+        "x-dead-letter-routing-key": "redemption.failed"
+      }
+    },
+    {
+      "name": "gasolinera.raffle.events",
+      "vhost": "gasolinera_vhost",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-message-ttl": 86400000,
+        "x-max-length": 50000,
+        "x-overflow": "reject-publish",
+        "x-dead-letter-exchange": "gasolinera.dead-letter",
+        "x-dead-letter-routing-key": "raffle.failed"
+      }
+    },
+    {
+      "name": "gasolinera.user.events",
+      "vhost": "gasolinera_vhost",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-message-ttl": 86400000,
+        "x-max-length": 200000,
+        "x-overflow": "reject-publish",
+        "x-dead-letter-exchange": "gasolinera.dead-letter",
+        "x-dead-letter-routing-key": "user.failed"
+      }
+    },
+    {
+      "name": "gasolinera.notification.events",
+      "vhost": "gasolinera_vhost",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-message-ttl": 3600000,
+        "x-max-length": 50000,
+        "x-overflow": "drop-head",
+        "x-dead-letter-exchange": "gasolinera.dead-letter",
+        "x-dead-letter-routing-key": "notification.failed"
+      }
+    },
+    {
+      "name": "gasolinera.audit.events",
+      "vhost": "gasolinera_vhost",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-message-ttl": 604800000,
+        "x-max-length": 1000000,
+        "x-overflow": "drop-head",
+        "queue-mode": "lazy"
+      }
+    },
+    {
+      "name": "gasolinera.critical.alerts",
+      "vhost": "gasolinera_vhost",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-message-ttl": 3600000,
+        "x-max-length": 10000,
+        "x-overflow": "reject-publish",
+        "x-max-priority": 10
+      }
+    },
+    {
+      "name": "gasolinera.dead-letter-queue",
+      "vhost": "gasolinera_vhost",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-message-ttl": 604800000,
+        "x-max-length": 50000,
+        "x-overflow": "drop-head",
+        "queue-mode": "lazy"
+      }
+    },
+    {
+      "name": "gasolinera.retry.queue",
+      "vhost": "gasolinera_vhost",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-message-ttl": 300000,
+        "x-max-length": 10000,
+        "x-overflow": "reject-publish",
+        "x-dead-letter-exchange": "gasolinera.events",
+        "x-dead-letter-routing-key": "retry.expired"
+      }
+    }
+  ],
+  "exchanges": [
+    {
+      "name": "gasolinera.events",
+      "vhost": "gasolinera_vhost",
+      "type": "topic",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {
+        "alternate-exchange": "gasolinera.unrouted"
+      }
+    },
+    {
+      "name": "gasolinera.notifications",
+      "vhost": "gasolinera_vhost",
+      "type": "fanout",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "gasolinera.dead-letter",
+      "vhost": "gasolinera_vhost",
+      "type": "direct",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "gasolinera.retry",
+      "vhost": "gasolinera_vhost",
+      "type": "direct",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "gasolinera.unrouted",
+      "vhost": "gasolinera_vhost",
+      "type": "fanout",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "gasolinera.delayed",
+      "vhost": "gasolinera_vhost",
+      "type": "x-delayed-message",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {
+        "x-delayed-type": "topic"
+      }
+    }
+  ],
+  "bindings": [
+    {
+      "source": "gasolinera.events",
+      "vhost": "gasolinera_vhost",
+      "destination": "gasolinera.coupon.events",
+      "destination_type": "queue",
+      "routing_key": "coupon.*",
+      "arguments": {}
+    },
+    {
+      "source": "gasolinera.events",
+      "vhost": "gasolinera_vhost",
+      "destination": "gasolinera.redemption.events",
+      "destination_type": "queue",
+      "routing_key": "redemption.*",
+      "arguments": {}
+    },
+    {
+      "source": "gasolinera.events",
+      "vhost": "gasolinera_vhost",
+      "destination": "gasolinera.raffle.events",
+      "destination_type": "queue",
+      "routing_key": "raffle.*",
+      "arguments": {}
+    },
+    {
+      "source": "gasolinera.events",
+      "vhost": "gasolinera_vhost",
+      "destination": "gasolinera.user.events",
+      "destination_type": "queue",
+      "routing_key": "user.*",
+      "arguments": {}
+    },
+    {
+      "source": "gasolinera.events",
+      "vhost": "gasolinera_vhost",
+      "destination": "gasolinera.audit.events",
+      "destination_type": "queue",
+      "routing_key": "audit.*",
+      "arguments": {}
+    },
+    {
+      "source": "gasolinera.events",
+      "vhost": "gasolinera_vhost",
+      "destination": "gasolinera.critical.alerts",
+      "destination_type": "queue",
+      "routing_key": "alert.critical.*",
+      "arguments": {}
+    },
+    {
+      "source": "gasolinera.notifications",
+      "vhost": "gasolinera_vhost",
+      "destination": "gasolinera.notification.events",
+      "destination_type": "queue",
+      "routing_key": "",
+      "arguments": {}
+    },
+    {
+      "source": "gasolinera.dead-letter",
+      "vhost": "gasolinera_vhost",
+      "destination": "gasolinera.dead-letter-queue",
+      "destination_type": "queue",
+      "routing_key": "#",
+      "arguments": {}
+    },
+    {
+      "source": "gasolinera.retry",
+      "vhost": "gasolinera_vhost",
+      "destination": "gasolinera.retry.queue",
+      "destination_type": "queue",
+      "routing_key": "retry",
+      "arguments": {}
+    },
+    {
+      "source": "gasolinera.unrouted",
+      "vhost": "gasolinera_vhost",
+      "destination": "gasolinera.dead-letter-queue",
+      "destination_type": "queue",
+      "routing_key": "",
+      "arguments": {}
+    }
+  ]
+}

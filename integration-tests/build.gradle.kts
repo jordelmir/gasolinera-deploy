@@ -1,53 +1,93 @@
+import java.time.Duration
+
 plugins {
-    id("org.springframework.boot") version "3.2.3"
-    id("io.spring.dependency-management") version "1.1.4"
-    kotlin("jvm") version "1.9.22"
-    kotlin("plugin.spring") version "1.9.22"
+    kotlin("jvm")
+    kotlin("plugin.spring")
+    id("org.springframework.boot")
+    id("io.spring.dependency-management")
 }
 
-group = "com.gasolinerajsm.integration"
-version = "0.0.1-SNAPSHOT"
-
-java {
-    sourceCompatibility = JavaVersion.VERSION_17
-}
-
-repositories {
-    mavenCentral()
-}
+group = "com.gasolinerajsm"
+version = "1.0.0"
 
 dependencies {
-    implementation("org.springframework.boot:spring-boot-starter-web")
-    implementation("org.springframework.boot:spring-boot-starter-test")
-    implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
-    implementation("org.jetbrains.kotlin:kotlin-reflect")
+    // Spring Boot Test
+    testImplementation("org.springframework.boot:spring-boot-starter-test")
+    testImplementation("org.springframework.boot:spring-boot-starter-web")
+    testImplementation("org.springframework.boot:spring-boot-starter-webflux")
 
-    // Testcontainers
+    // Test Containers
+    testImplementation("org.testcontainers:testcontainers")
     testImplementation("org.testcontainers:junit-jupiter")
     testImplementation("org.testcontainers:postgresql")
-    testImplementation("org.testcontainers:kafka")
-    testImplementation("org.testcontainers:redis")
+    testImplementation("org.testcontainers:rabbitmq")
 
-    // JWT for auth-service interaction
-    testImplementation("io.jsonwebtoken:jjwt-api:0.11.5")
-    testImplementation("io.jsonwebtoken:jjwt-impl:0.11.5")
-    testImplementation("io.jsonwebtoken:jjwt-jackson:0.11.5")
+    // HTTP Client
+    testImplementation("io.rest-assured:rest-assured")
+    testImplementation("io.rest-assured:kotlin-extensions")
 
-    // HTTP client for testing microservices
-    testImplementation("io.rest-assured:rest-assured:5.3.0")
+    // JSON Processing
+    testImplementation("com.fasterxml.jackson.module:jackson-module-kotlin")
 
-    // Database access for verification
-    testImplementation("org.springframework.boot:spring-boot-starter-data-jpa")
+    // Kotlin Test
+    testImplementation("io.kotest:kotest-runner-junit5")
+    testImplementation("io.kotest:kotest-assertions-core")
+    testImplementation("io.kotest:kotest-extensions-spring")
+
+    // Awaitility for async testing
+    testImplementation("org.awaitility:awaitility-kotlin")
+
+    // Database
     testImplementation("org.postgresql:postgresql")
+    testImplementation("org.flywaydb:flyway-core")
+
+    // Messaging
+    testImplementation("org.springframework.boot:spring-boot-starter-amqp")
+
+    // Shared modules
+    testImplementation(project(":shared:messaging"))
+    testImplementation(project(":shared:security"))
+    testImplementation(project(":shared:common"))
 }
 
-tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
-    kotlinOptions {
-        freeCompilerArgs += "-Xjsr305=strict"
-        jvmTarget = "17"
+tasks.withType<Test> {
+    useJUnitPlatform()
+
+    // Set system properties for integration tests
+    systemProperty("spring.profiles.active", "integration-test")
+    systemProperty("testcontainers.reuse.enable", "true")
+
+    // Increase timeout for integration tests
+    timeout.set(Duration.ofMinutes(10))
+
+    // Configure test execution
+    maxParallelForks = 1
+    forkEvery = 1
+
+    // JVM arguments for better performance
+    jvmArgs("-XX:+UseG1GC", "-Xmx2g")
+}
+
+// Task to run only integration tests
+tasks.register<Test>("integrationTest") {
+    description = "Runs integration tests"
+    group = "verification"
+
+    useJUnitPlatform {
+        includeTags("integration")
     }
+
+    shouldRunAfter("test")
 }
 
-tasks.withType<org.springframework.boot.gradle.tasks.bundling.BootJar> {
-    enabled = false // This is a test module, no need to build a boot jar
+// Task to run end-to-end tests
+tasks.register<Test>("e2eTest") {
+    description = "Runs end-to-end tests"
+    group = "verification"
+
+    useJUnitPlatform {
+        includeTags("e2e")
+    }
+
+    shouldRunAfter("integrationTest")
 }

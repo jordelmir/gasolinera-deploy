@@ -1,0 +1,309 @@
+# Prometheus Recording Rules for Gasolinera JSM
+groups:
+  - name: gasolinera-jsm-performance-recording
+    interval: 30s
+    rules:
+      # HTTP Request Rate Recording Rules
+      - record: gasolinera:http_requests:rate5m
+        expr: rate(http_server_requests_total[5m])
+        labels:
+          aggregation: "5m_rate"
+
+      - record: gasolinera:http_requests:rate1h
+        expr: rate(http_server_requests_total[1h])
+        labels:
+          aggregation: "1h_rate"
+
+      # HTTP Request Latency Recording Rules
+      - record: gasolinera:http_request_duration:p50_5m
+        expr: histogram_quantile(0.50, rate(http_server_requests_seconds_bucket[5m]))
+        labels:
+          quantile: "0.50"
+          aggregation: "5m"
+
+      - record: gasolinera:http_request_duration:p95_5m
+        expr: histogram_quantile(0.95, rate(http_server_requests_seconds_bucket[5m]))
+        labels:
+          quantile: "0.95"
+          aggregation: "5m"
+
+      - record: gasolinera:http_request_duration:p99_5m
+        expr: histogram_quantile(0.99, rate(http_server_requests_seconds_bucket[5m]))
+        labels:
+          quantile: "0.99"
+          aggregation: "5m"
+
+      - record: gasolinera:http_request_duration:p99_1h
+        expr: histogram_quantile(0.99, rate(http_server_requests_seconds_bucket[1h]))
+        labels:
+          quantile: "0.99"
+          aggregation: "1h"
+
+      # Error Rate Recording Rules
+      - record: gasolinera:http_requests:error_rate_5m
+        expr: rate(http_server_requests_total{status=~"5.."}[5m]) / rate(http_server_requests_total[5m])
+        labels:
+          aggregation: "5m_error_rate"
+
+      - record: gasolinera:http_requests:error_rate_1h
+        expr: rate(http_server_requests_total{status=~"5.."}[1h]) / rate(http_server_requests_total[1h])
+        labels:
+          aggregation: "1h_error_rate"
+
+      # Success Rate Recording Rules
+      - record: gasolinera:http_requests:success_rate_5m
+        expr: rate(http_server_requests_total{status!~"5.."}[5m]) / rate(http_server_requests_total[5m])
+        labels:
+          aggregation: "5m_success_rate"
+
+      - record: gasolinera:http_requests:success_rate_1h
+        expr: rate(http_server_requests_total{status!~"5.."}[1h]) / rate(http_server_requests_total[1h])
+        labels:
+          aggregation: "1h_success_rate"
+
+  - name: gasolinera-jsm-jvm-recording
+    interval: 30s
+    rules:
+      # JVM Memory Recording Rules
+      - record: gasolinera:jvm_memory:heap_usage_ratio
+        expr: jvm_memory_used_bytes{area="heap"} / jvm_memory_max_bytes{area="heap"}
+        labels:
+          memory_area: "heap"
+
+      - record: gasolinera:jvm_memory:nonheap_usage_ratio
+        expr: jvm_memory_used_bytes{area="nonheap"} / jvm_memory_max_bytes{area="nonheap"}
+        labels:
+          memory_area: "nonheap"
+
+      # JVM GC Recording Rules
+      - record: gasolinera:jvm_gc:collection_rate_5m
+        expr: rate(jvm_gc_collection_seconds_count[5m])
+        labels:
+          aggregation: "5m_rate"
+
+      - record: gasolinera:jvm_gc:collection_time_rate_5m
+        expr: rate(jvm_gc_collection_seconds_sum[5m])
+        labels:
+          aggregation: "5m_time_rate"
+
+      - record: gasolinera:jvm_gc:avg_collection_time_5m
+        expr: rate(jvm_gc_collection_seconds_sum[5m]) / rate(jvm_gc_collection_seconds_count[5m])
+        labels:
+          aggregation: "5m_avg_time"
+
+      # JVM Thread Recording Rules
+      - record: gasolinera:jvm_threads:active_ratio
+        expr: jvm_threads_current / jvm_threads_peak
+        labels:
+          thread_metric: "active_ratio"
+
+      # CPU Usage Recording Rules
+      - record: gasolinera:process_cpu:usage_rate_5m
+        expr: rate(process_cpu_seconds_total[5m])
+        labels:
+          aggregation: "5m_rate"
+
+  - name: gasolinera-jsm-database-recording
+    interval: 60s
+    rules:
+      # Database Connection Pool Recording Rules
+      - record: gasolinera:hikaricp:connection_usage_ratio
+        expr: hikaricp_connections_active / hikaricp_connections_max
+        labels:
+          pool_metric: "usage_ratio"
+
+      - record: gasolinera:hikaricp:connection_wait_time_p95_5m
+        expr: histogram_quantile(0.95, rate(hikaricp_connections_acquire_seconds_bucket[5m]))
+        labels:
+          quantile: "0.95"
+          aggregation: "5m"
+
+      # Database Query Performance
+      - record: gasolinera:db_queries:rate_5m
+        expr: rate(hikaricp_connections_acquire_seconds_count[5m])
+        labels:
+          aggregation: "5m_rate"
+
+  - name: gasolinera-jsm-business-recording
+    interval: 60s
+    rules:
+      # Business Metrics Recording Rules
+      - record: gasolinera:business:coupon_creation_rate_5m
+        expr: rate(coupon_created_total[5m])
+        labels:
+          business_metric: "coupon_creation_rate"
+          aggregation: "5m"
+
+      - record: gasolinera:business:coupon_redemption_rate_5m
+        expr: rate(coupon_redeemed_total[5m])
+        labels:
+          business_metric: "coupon_redemption_rate"
+          aggregation: "5m"
+
+      - record: gasolinera:business:coupon_redemption_success_rate_5m
+        expr: rate(coupon_redeemed_success_total[5m]) / rate(coupon_redeemed_total[5m])
+        labels:
+          business_metric: "coupon_redemption_success_rate"
+          aggregation: "5m"
+
+      - record: gasolinera:business:raffle_ticket_generation_rate_5m
+        expr: rate(raffle_tickets_generated_total[5m])
+        labels:
+          business_metric: "raffle_ticket_generation_rate"
+          aggregation: "5m"
+
+      - record: gasolinera:business:user_registration_rate_5m
+        expr: rate(user_registered_total[5m])
+        labels:
+          business_metric: "user_registration_rate"
+          aggregation: "5m"
+
+      # Revenue Metrics
+      - record: gasolinera:business:revenue_rate_5m
+        expr: rate(coupon_purchase_amount_total[5m])
+        labels:
+          business_metric: "revenue_rate"
+          aggregation: "5m"
+
+      - record: gasolinera:business:avg_coupon_amount_5m
+        expr: rate(coupon_purchase_amount_total[5m]) / rate(coupon_created_total[5m])
+        labels:
+          business_metric: "avg_coupon_amount"
+          aggregation: "5m"
+
+  - name: gasolinera-jsm-infrastructure-recording
+    interval: 60s
+    rules:
+      # Redis Recording Rules
+      - record: gasolinera:redis:memory_usage_ratio
+        expr: redis_memory_used_bytes / redis_memory_max_bytes
+        labels:
+          redis_metric: "memory_usage_ratio"
+
+      - record: gasolinera:redis:hit_rate_5m
+        expr: rate(redis_keyspace_hits_total[5m]) / (rate(redis_keyspace_hits_total[5m]) + rate(redis_keyspace_misses_total[5m]))
+        labels:
+          redis_metric: "hit_rate"
+          aggregation: "5m"
+
+      - record: gasolinera:redis:commands_rate_5m
+        expr: rate(redis_commands_processed_total[5m])
+        labels:
+          redis_metric: "commands_rate"
+          aggregation: "5m"
+
+      # RabbitMQ Recording Rules
+      - record: gasolinera:rabbitmq:message_rate_5m
+        expr: rate(rabbitmq_queue_messages_published_total[5m])
+        labels:
+          rabbitmq_metric: "message_rate"
+          aggregation: "5m"
+
+      - record: gasolinera:rabbitmq:consumer_rate_5m
+        expr: rate(rabbitmq_queue_messages_delivered_total[5m])
+        labels:
+          rabbitmq_metric: "consumer_rate"
+          aggregation: "5m"
+
+      - record: gasolinera:rabbitmq:queue_depth_avg
+        expr: avg(rabbitmq_queue_messages) by (queue)
+        labels:
+          rabbitmq_metric: "queue_depth_avg"
+
+      # PostgreSQL Recording Rules
+      - record: gasolinera:postgresql:connection_usage_ratio
+        expr: pg_stat_database_numbackends / pg_settings_max_connections
+        labels:
+          postgresql_metric: "connection_usage_ratio"
+
+      - record: gasolinera:postgresql:query_rate_5m
+        expr: rate(pg_stat_database_xact_commit[5m]) + rate(pg_stat_database_xact_rollback[5m])
+        labels:
+          postgresql_metric: "query_rate"
+          aggregation: "5m"
+
+      - record: gasolinera:postgresql:cache_hit_ratio
+        expr: pg_stat_database_blks_hit / (pg_stat_database_blks_hit + pg_stat_database_blks_read)
+        labels:
+          postgresql_metric: "cache_hit_ratio"
+
+  - name: gasolinera-jsm-sla-recording
+    interval: 300s # 5 minutes
+    rules:
+      # SLA Recording Rules (calculated over longer periods)
+      - record: gasolinera:sla:availability_5m
+        expr: gasolinera:http_requests:success_rate_5m
+        labels:
+          sla_metric: "availability"
+          aggregation: "5m"
+
+      - record: gasolinera:sla:availability_1h
+        expr: gasolinera:http_requests:success_rate_1h
+        labels:
+          sla_metric: "availability"
+          aggregation: "1h"
+
+      - record: gasolinera:sla:latency_p95_5m
+        expr: gasolinera:http_request_duration:p95_5m
+        labels:
+          sla_metric: "latency_p95"
+          aggregation: "5m"
+
+      - record: gasolinera:sla:latency_p99_1h
+        expr: gasolinera:http_request_duration:p99_1h
+        labels:
+          sla_metric: "latency_p99"
+          aggregation: "1h"
+
+      - record: gasolinera:sla:throughput_5m
+        expr: gasolinera:http_requests:rate5m
+        labels:
+          sla_metric: "throughput"
+          aggregation: "5m"
+
+      # Service Level Indicators (SLIs)
+      - record: gasolinera:sli:error_budget_5m
+        expr: 1 - gasolinera:http_requests:error_rate_5m
+        labels:
+          sli_metric: "error_budget"
+          aggregation: "5m"
+
+      - record: gasolinera:sli:latency_budget_5m
+        expr: |
+          (
+            sum(rate(http_server_requests_seconds_bucket{le="0.2"}[5m])) by (job)
+            /
+            sum(rate(http_server_requests_seconds_count[5m])) by (job)
+          )
+        labels:
+          sli_metric: "latency_budget"
+          aggregation: "5m"
+          threshold: "200ms"
+
+  - name: gasolinera-jsm-capacity-recording
+    interval: 300s # 5 minutes
+    rules:
+      # Capacity Planning Recording Rules
+      - record: gasolinera:capacity:cpu_utilization_avg_1h
+        expr: avg_over_time(gasolinera:process_cpu:usage_rate_5m[1h])
+        labels:
+          capacity_metric: "cpu_utilization"
+          aggregation: "1h_avg"
+
+      - record: gasolinera:capacity:memory_utilization_avg_1h
+        expr: avg_over_time(gasolinera:jvm_memory:heap_usage_ratio[1h])
+        labels:
+          capacity_metric: "memory_utilization"
+          aggregation: "1h_avg"
+
+      - record: gasolinera:capacity:request_rate_max_1h
+        expr: max_over_time(gasolinera:http_requests:rate5m[1h])
+        labels:
+          capacity_metric: "request_rate_max"
+          aggregation: "1h_max"
+
+      - record: gasolinera:capacity:db_connection_utilization_max_1h
+        expr: max_over_time(gasolinera:hikaricp:connection_usage_ratio[1h])
+        labels:
+          capacity_metric: "db_connection_utilization"
+          aggregation: "1h_max"

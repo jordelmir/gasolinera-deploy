@@ -1,0 +1,152 @@
+# ==========================================
+# JVM Configuration for Production
+# Gasolinera JSM - World-Class Performance
+# ==========================================
+
+# Memory Settings (Optimized for 8GB+ systems)
+-Xms2g
+-Xmx4g
+-XX:MetaspaceSize=256m
+-XX:MaxMetaspaceSize=512m
+-XX:CompressedClassSpaceSize=128m
+
+# Garbage Collection (G1GC - Optimized for low latency)
+-XX:+UseG1GC
+-XX:MaxGCPauseMillis=200
+-XX:G1HeapRegionSize=16m
+-XX:G1NewSizePercent=30
+-XX:G1MaxNewSizePercent=40
+-XX:G1MixedGCCountTarget=8
+-XX:InitiatingHeapOccupancyPercent=45
+-XX:G1MixedGCLiveThresholdPercent=85
+-XX:G1HeapWastePercent=5
+
+# Performance Optimizations
+-XX:+UseStringDeduplication
+-XX:+OptimizeStringConcat
+-XX:+UseCompressedOops
+-XX:+UseCompressedClassPointers
+-XX:+UnlockExperimentalVMOptions
+-XX:+UseCGroupMemoryLimitForHeap
+-XX:+PreferContainerQuotaForCPUCount
+
+# JIT Compiler Optimizations
+-XX:+TieredCompilation
+-XX:TieredStopAtLevel=4
+-XX:CompileThreshold=10000
+-XX:+UseCodeCacheFlushing
+-XX:ReservedCodeCacheSize=256m
+-XX:InitialCodeCacheSize=64m
+
+# Memory Management
+-XX:+AlwaysPreTouch
+-XX:+UseLargePages
+-XX:LargePageSizeInBytes=2m
+-XX:+UseBiasedLocking
+-XX:BiasedLockingStartupDelay=0
+
+# Security and Stability
+-XX:+HeapDumpOnOutOfMemoryError
+-XX:HeapDumpPath=/tmp/heapdumps/
+-XX:+ExitOnOutOfMemoryError
+-XX:+CrashOnOutOfMemoryError
+-XX:ErrorFile=/tmp/hs_err_pid%p.log
+
+# Networking and I/O
+-Djava.net.preferIPv4Stack=true
+-Djava.awt.headless=true
+-Dfile.encoding=UTF-8
+-Duser.timezone=UTC
+
+# Security Manager (if needed)
+-Djava.security.egd=file:/dev/./urandom
+
+# Spring Boot Optimizations
+-Dspring.backgroundpreinitializer.ignore=true
+-Dspring.jmx.enabled=false
+
+# Logging Performance
+-Dlogging.pattern.console=%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n
+-Dlogging.level.org.springframework.web=INFO
+-Dlogging.level.org.hibernate.SQL=WARN
+
+# Monitoring and Profiling (Production)
+-XX:+FlightRecorder
+-XX:StartFlightRecording=duration=60s,filename=/tmp/flight-recording.jfr
+-XX:FlightRecorderOptions=settings=profile
+
+# GC Logging (for analysis)
+-Xlog:gc*:gc.log:time,tags
+-XX:+UseGCLogFileRotation
+-XX:NumberOfGCLogFiles=5
+-XX:GCLogFileSize=100M
+
+# Debug Options (remove in production)
+# -XX:+PrintGC
+# -XX:+PrintGCDetails
+# -XX:+PrintGCTimeStamps
+# -XX:+PrintGCApplicationStoppedTime
+
+# Advanced Performance Tuning
+-XX:+AggressiveOpts
+-XX:+UseFastAccessorMethods
+-XX:+OptimizeStringConcat
+-XX:+DoEscapeAnalysis
+-XX:+EliminateAllocations
+-XX:+EliminateLocks
+-XX:+UseBiasedLocking
+
+# Container Awareness (Kubernetes/Docker)
+-XX:+UseContainerSupport
+-XX:MaxRAMPercentage=75.0
+-XX:InitialRAMPercentage=50.0
+
+# Network Performance
+-Dnetworkaddress.cache.ttl=60
+-Dnetworkaddress.cache.negative.ttl=10
+
+# HTTP Client Optimizations
+-Dhttp.keepAlive=true
+-Dhttp.maxConnections=50
+-Dhttp.maxRedirects=10
+
+# SSL/TLS Performance
+-Djdk.tls.ephemeralDHKeySize=2048
+-Djdk.tls.rejectClientInitiatedRenegotiation=true
+
+# Locale and Internationalization
+-Duser.language=en
+-Duser.country=US
+
+# Application-Specific Optimizations
+-Dspring.profiles.active=production
+-Dserver.tomcat.max-threads=200
+-Dserver.tomcat.min-spare-threads=10
+-Dserver.tomcat.max-connections=8192
+-Dserver.tomcat.accept-count=100
+-Dserver.tomcat.connection-timeout=20000
+
+# Database Connection Pool
+-Dspring.datasource.hikari.maximum-pool-size=20
+-Dspring.datasource.hikari.minimum-idle=5
+-Dspring.datasource.hikari.connection-timeout=30000
+-Dspring.datasource.hikari.idle-timeout=600000
+-Dspring.datasource.hikari.max-lifetime=1800000
+-Dspring.datasource.hikari.leak-detection-threshold=60000
+
+# Redis Configuration
+-Dspring.redis.timeout=2000ms
+-Dspring.redis.jedis.pool.max-active=20
+-Dspring.redis.jedis.pool.max-idle=10
+-Dspring.redis.jedis.pool.min-idle=5
+-Dspring.redis.jedis.pool.max-wait=2000ms
+
+# Monitoring and Metrics
+-Dmanagement.endpoints.web.exposure.include=health,info,metrics,prometheus
+-Dmanagement.endpoint.health.show-details=always
+-Dmanagement.metrics.export.prometheus.enabled=true
+
+# Security Headers
+-Dserver.servlet.session.cookie.secure=true
+-Dserver.servlet.session.cookie.http-only=true
+-Dserver.servlet.session.cookie.same-site=strict

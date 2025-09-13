@@ -1,0 +1,219 @@
+# Kubernetes Ingress Configuration for Gasolinera JSM
+# External access and load balancing with SSL termination
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: gasolinera-jsm-ingress
+  namespace: gasolinera-jsm
+  labels:
+    app.kubernetes.io/name: gasolinera-jsm-ingress
+    app.kubernetes.io/component: ingress
+    app.kubernetes.io/part-of: gasolinera-jsm-platform
+  annotations:
+    # NGINX Ingress Controller annotations
+    kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+    nginx.ingress.kubernetes.io/client-max-body-size: "50m"
+
+    # Rate limiting
+    nginx.ingress.kubernetes.io/rate-limit: "100"
+    nginx.ingress.kubernetes.io/rate-limit-window: "1m"
+
+    # CORS configuration
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/cors-allow-origin: "https://gasolinera-jsm.com,https://www.gasolinera-jsm.com"
+    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, PUT, DELETE, OPTIONS"
+    nginx.ingress.kubernetes.io/cors-allow-headers: "DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization"
+    nginx.ingress.kubernetes.io/cors-expose-headers: "Content-Length,Content-Range"
+    nginx.ingress.kubernetes.io/cors-max-age: "1728000"
+
+    # Security headers
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      more_set_headers "X-Frame-Options: DENY";
+      more_set_headers "X-Content-Type-Options: nosniff";
+      more_set_headers "X-XSS-Protection: 1; mode=block";
+      more_set_headers "Referrer-Policy: strict-origin-when-cross-origin";
+      more_set_headers "Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' wss: https:; frame-ancestors 'none';";
+
+    # SSL configuration
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/ssl-protocols: "TLSv1.2 TLSv1.3"
+    nginx.ingress.kubernetes.io/ssl-ciphers: "ECDHE-ECDSA-AES128-GCM-SHA256,ECDHE-RSA-AES128-GCM-SHA256,ECDHE-ECDSA-AES256-GCM-SHA384,ECDHE-RSA-AES256-GCM-SHA384"
+spec:
+  tls:
+  - hosts:
+    - gasolinera-jsm.com
+    - www.gasolinera-jsm.com
+    - api.gasolinera-jsm.com
+    - admin.gasolinera-jsm.com
+    secretName: gasolinera-tls
+  rules:
+  # Main application domain
+  - host: gasolinera-jsm.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: frontend-service
+            port:
+              number: 80
+
+  # WWW redirect
+  - host: www.gasolinera-jsm.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: frontend-service
+            port:
+              number: 80
+
+  # API Gateway
+  - host: api.gasolinera-jsm.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: api-gateway
+            port:
+              number: 8080
+      - path: /health
+        pathType: Prefix
+        backend:
+          service:
+            name: api-gateway
+            port:
+              number: 8081
+
+  # Admin/Monitoring interfaces
+  - host: admin.gasolinera-jsm.com
+    http:
+      paths:
+      - path: /grafana(/|$)(.*)
+        pathType: Prefix
+        backend:
+          service:
+            name: grafana
+            port:
+              number: 3000
+      - path: /prometheus(/|$)(.*)
+        pathType: Prefix
+        backend:
+          service:
+            name: prometheus
+            port:
+              number: 9090
+      - path: /rabbitmq(/|$)(.*)
+        pathType: Prefix
+        backend:
+          service:
+            name: rabbitmq
+            port:
+              number: 15672
+---
+# Internal Services Ingress (for development/debugging)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: gasolinera-jsm-internal
+  namespace: gasolinera-jsm
+  labels:
+    app.kubernetes.io/name: gasolinera-jsm-internal
+    app.kubernetes.io/component: ingress
+    app.kubernetes.io/part-of: gasolinera-jsm-platform
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/auth-type: basic
+    nginx.ingress.kubernetes.io/auth-secret: basic-auth
+    nginx.ingress.kubernetes.io/auth-realm: "Authentication Required - Gasolinera JSM Internal"
+    nginx.ingress.kubernetes.io/whitelist-source-range: "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
+spec:
+  tls:
+  - hosts:
+    - internal.gasolinera-jsm.com
+    secretName: gasolinera-internal-tls
+  rules:
+  - host: internal.gasolinera-jsm.com
+    http:
+      paths:
+      # Individual microservices for debugging
+      - path: /user-service(/|$)(.*)
+        pathType: Prefix
+        backend:
+          service:
+            name: user-service
+            port:
+              number: 8080
+      - path: /station-service(/|$)(.*)
+        pathType: Prefix
+        backend:
+          service:
+            name: station-service
+            port:
+              number: 8080
+      - path: /fuel-service(/|$)(.*)
+        pathType: Prefix
+        backend:
+          service:
+            name: fuel-service
+            port:
+              number: 8080
+      - path: /payment-service(/|$)(.*)
+        pathType: Prefix
+        backend:
+          service:
+            name: payment-service
+            port:
+              number: 8080
+      - path: /notification-service(/|$)(.*)
+        pathType: Prefix
+        backend:
+          service:
+            name: notification-service
+            port:
+              number: 8080
+
+      # Health endpoints
+      - path: /health/user-service(/|$)(.*)
+        pathType: Prefix
+        backend:
+          service:
+            name: user-service
+            port:
+              number: 8081
+      - path: /health/station-service(/|$)(.*)
+        pathType: Prefix
+        backend:
+          service:
+            name: station-service
+            port:
+              number: 8081
+---
+# Basic Auth Secret for Internal Access
+apiVersion: v1
+kind: Secret
+metadata:
+  name: basic-auth
+  namespace: gasolinera-jsm
+  labels:
+    app.kubernetes.io/name: gasolinera-jsm
+    app.kubernetes.io/component: security
+type: Opaque
+data:
+  # admin:$2y$10$... (bcrypt hash of password)
+  # Generate with: htpasswd -nb admin your_password | base64
+  auth: YWRtaW46JDJ5JDEwJE5vUXVlc3RpT25IYXNoSGVyZUZvclNlY3VyaXR5

@@ -1,0 +1,501 @@
+# ==========================================
+# Prometheus Alerting Rules
+# Gasolinera JSM - World-Class Production Monitoring
+# ==========================================
+
+groups:
+  # ==========================================
+  # Critical System Alerts (P0)
+  # ==========================================
+  - name: gasolinera-jsm-critical
+    interval: 15s
+    rules:
+      - alert: ServiceDown
+        expr: up{job=~"gasolinera-jsm-.*"} == 0
+        for: 30s
+        labels:
+          severity: critical
+          priority: P0
+          team: platform
+        annotations:
+          summary: "🚨 Service {{ $labels.job }} is DOWN"
+          description: "Service {{ $labels.job }} on {{ $labels.instance }} has been down for more than 30 seconds"
+          runbook_url: "https://runbooks.gasolinera-jsm.com/service-down"
+          dashboard_url: "https://grafana.gasolinera-jsm.com/d/service-overview"
+
+      - alert: HighErrorRate
+        expr: |
+          (
+            rate(http_requests_total{status=~"5.."}[5m]) /
+            rate(http_requests_total[5m])
+          ) * 100 > 5
+        for: 2m
+        labels:
+          severity: critical
+          priority: P0
+          team: platform
+        annotations:
+          summary: "🚨 High error rate detected: {{ $value }}%"
+          description: "Error rate is {{ $value }}% for service {{ $labels.service }} (threshold: 5%)"
+          runbook_url: "https://runbooks.gasolinera-jsm.com/high-error-rate"
+
+      - alert: DatabaseConnectionPoolExhausted
+        expr: |
+          (
+            hikaricp_connections_active /
+            hikaricp_connections_max
+          ) * 100 > 90
+        for: 1m
+        labels:
+          severity: critical
+          priority: P0
+          team: platform
+        annotations:
+          summary: "🚨 Database connection pool nearly exhausted"
+          description: "Connection pool usage is {{ $value }}% for {{ $labels.service }}"
+          runbook_url: "https://runbooks.gasolinera-jsm.com/db-connection-pool"
+
+      - alert: OutOfMemory
+        expr: |
+          (
+            container_memory_usage_bytes{container!="POD",container!=""} /
+            container_spec_memory_limit_bytes
+          ) * 100 > 90
+        for: 2m
+        labels:
+          severity: critical
+          priority: P0
+          team: platform
+        annotations:
+          summary: "🚨 Container memory usage critical: {{ $value }}%"
+          description: "Container {{ $labels.container }} in pod {{ $labels.pod }} is using {{ $value }}% of memory"
+          runbook_url: "https://runbooks.gasolinera-jsm.com/out-of-memory"
+
+      - alert: DiskSpaceCritical
+        expr: |
+          (
+            node_filesystem_avail_bytes{mountpoint="/"} /
+            node_filesystem_size_bytes{mountpoint="/"}
+          ) * 100 < 10
+        for: 1m
+        labels:
+          severity: critical
+          priority: P0
+          team: platform
+        annotations:
+          summary: "🚨 Disk space critically low: {{ $value }}%"
+          description: "Disk space on {{ $labels.instance }} is {{ $value }}% full"
+          runbook_url: "https://runbooks.gasolinera-jsm.com/disk-space"
+
+  # ==========================================
+  # High Priority Alerts (P1)
+  # ==========================================
+  - name: gasolinera-jsm-high-priority
+    interval: 30s
+    rules:
+      - alert: HighLatency
+        expr: |
+          histogram_quantile(0.95,
+            rate(http_request_duration_seconds_bucket[5m])
+          ) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+          priority: P1
+          team: platform
+        annotations:
+          summary: "⚠️ High latency detected: {{ $value }}s"
+          description: "95th percentile latency is {{ $value }}s for {{ $labels.service }} (threshold: 0.5s)"
+          runbook_url: "https://runbooks.gasolinera-jsm.com/high-latency"
+
+      - alert: HighCPUUsage
+        expr: |
+          (
+            rate(container_cpu_usage_seconds_total{container!="POD",container!=""}[5m]) /
+            container_spec_cpu_quota * container_spec_cpu_period
+          ) * 100 > 80
+        for: 10m
+        labels:
+          severity: warning
+          priority: P1
+          team: platform
+        annotations:
+          summary: "⚠️ High CPU usage: {{ $value }}%"
+          description: "Container {{ $labels.container }} CPU usage is {{ $value }}%"
+          runbook_url: "https://runbooks.gasolinera-jsm.com/high-cpu"
+
+      - alert: PodCrashLooping
+        expr: |
+          rate(kube_pod_container_status_restarts_total[15m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+          priority: P1
+          team: platform
+        annotations:
+          summary: "⚠️ Pod crash looping detected"
+          description: "Pod {{ $labels.pod }} in namespace {{ $labels.namespace }} is crash looping"
+          runbook_url: "https://runbooks.gasolinera-jsm.com/pod-crash-loop"
+
+      - alert: SlowDatabaseQueries
+        expr: |
+          histogram_quantile(0.95,
+            rate(database_query_duration_seconds_bucket[5m])
+          ) > 1.0
+        for: 5m
+        labels:
+          severity: warning
+          priority: P1
+          team: platform
+        annotations:
+          summary: "⚠️ Slow database queries detected"
+          description: "95th percentile query time is {{ $value }}s (threshold: 1.0s)"
+          runbook_url: "https://runbooks.gasolinera-jsm.com/slow-queries"
+
+  # ==========================================
+  # Business Logic Alerts
+  # ==========================================
+  - name: gasolinera-jsm-business
+    interval: 60s
+    rules:
+      - alert: CouponCreationFailureRate
+        expr: |
+          (
+            rate(business_coupon_creation_failures_total[10m]) /
+            rate(business_coupon_creation_attempts_total[10m])
+          ) * 100 > 10
+        for: 5m
+        labels:
+          severity: warning
+          priority: P1
+          team: business
+        annotations:
+          summary: "⚠️ High coupon creation failure rate: {{ $value }}%"
+          description: "Coupon creation failure rate is {{ $value }}% (threshold: 10%)"
+          runbook_url: "https://runbooks.gasolinera-jsm.com/coupon-failures"
+
+      - alert: PaymentProcessingFailures
+        expr: |
+          rate(business_payment_failures_total[5m]) > 0.1
+        for: 3m
+        labels:
+          severity: critical
+          priority: P0
+          team: business
+        annotations:
+          summary: "🚨 Payment processing failures detected"
+          description: "Payment failure rate: {{ $value }} failures/second"
+          runbook_url: "https://runbooks.gasolinera-jsm.com/payment-failures"
+
+      - alert: LowCouponRedemptionRate
+        expr: |
+          (
+            rate(business_coupon_redemptions_total[1h]) /
+            rate(business_coupon_purchases_total[1h])
+          ) * 100 < 30
+        for: 30m
+        labels:
+          severity: warning
+          priority: P2
+          team: business
+        annotations:
+          summary: "⚠️ Low coupon redemption rate: {{ $value }}%"
+          description: "Coupon redemption rate has dropped to {{ $value }}% (expected: >30%)"
+          runbook_url: "https://runbooks.gasolinera-jsm.com/low-redemption"
+
+      - alert: RaffleTicketGenerationFailure
+        expr: |
+          rate(business_raffle_ticket_generation_failures_total[10m]) > 0
+        for: 2m
+        labels:
+          severity: warning
+          priority: P1
+          team: business
+        annotations:
+          summary: "⚠️ Raffle ticket generation failures"
+          description: "Raffle ticket generation failing at {{ $value }} failures/second"
+          runbook_url: "https://runbooks.gasolinera-jsm.com/raffle-failures"
+
+  # ==========================================
+  # Infrastructure Alerts
+  # ==========================================
+  - name: gasolinera-jsm-infrastructure
+    interval: 60s
+    rules:
+      - alert: RedisConnectionFailures
+        expr: |
+          rate(redis_connection_errors_total[5m]) > 0.1
+        for: 2m
+        labels:
+          severity: warning
+          priority: P1
+          team: platform
+        annotations:
+          summary: "⚠️ Redis connection failures detected"
+          description: "Redis connection error rate: {{ $value }} errors/second"
+          runbook_url: "https://runbooks.gasolinera-jsm.com/redis-failures"
+
+      - alert: RabbitMQQueueBacklog
+        expr: |
+          rabbitmq_queue_messages > 1000
+        for: 10m
+        labels:
+          severity: warning
+          priority: P1
+          team: platform
+        annotations:
+          summary: "⚠️ RabbitMQ queue backlog detected"
+          description: "Queue {{ $labels.queue }} has {{ $value }} messages"
+          runbook_url: "https://runbooks.gasolinera-jsm.com/rabbitmq-backlog"
+
+      - alert: KubernetesNodeNotReady
+        expr: |
+          kube_node_status_condition{condition="Ready",status="true"} == 0
+        for: 5m
+        labels:
+          severity: critical
+          priority: P0
+          team: platform
+        annotations:
+          summary: "🚨 Kubernetes node not ready"
+          description: "Node {{ $labels.node }} is not ready"
+          runbook_url: "https://runbooks.gasolinera-jsm.com/node-not-ready"
+
+      - alert: PersistentVolumeUsageHigh
+        expr: |
+          (
+            kubelet_volume_stats_used_bytes /
+            kubelet_volume_stats_capacity_bytes
+          ) * 100 > 85
+        for: 10m
+        labels:
+          severity: warning
+          priority: P1
+          team: platform
+        annotations:
+          summary: "⚠️ Persistent volume usage high: {{ $value }}%"
+          description: "PV {{ $labels.persistentvolumeclaim }} usage is {{ $value }}%"
+          runbook_url: "https://runbooks.gasolinera-jsm.com/pv-usage"
+
+  # ==========================================
+  # Security Alerts
+  # ==========================================
+  - name: gasolinera-jsm-security
+    interval: 30s
+    rules:
+      - alert: HighFailedLoginAttempts
+        expr: |
+          rate(business_security_login_failures_total[5m]) > 10
+        for: 2m
+        labels:
+          severity: warning
+          priority: P1
+          team: security
+        annotations:
+          summary: "⚠️ High failed login attempts detected"
+          description: "Failed login rate: {{ $value }} attempts/second"
+          runbook_url: "https://runbooks.gasolinera-jsm.com/failed-logins"
+
+      - alert: SuspiciousActivity
+        expr: |
+          rate(business_security_suspicious_activities_total[5m]) > 1
+        for: 1m
+        labels:
+          severity: critical
+          priority: P0
+          team: security
+        annotations:
+          summary: "🚨 Suspicious activity detected"
+          description: "Suspicious activity rate: {{ $value }} events/second"
+          runbook_url: "https://runbooks.gasolinera-jsm.com/suspicious-activity"
+
+      - alert: UnauthorizedAPIAccess
+        expr: |
+          rate(http_requests_total{status="401"}[5m]) > 5
+        for: 3m
+        labels:
+          severity: warning
+          priority: P1
+          team: security
+        annotations:
+          summary: "⚠️ High unauthorized API access attempts"
+          description: "401 error rate: {{ $value }} requests/second for {{ $labels.service }}"
+          runbook_url: "https://runbooks.gasolinera-jsm.com/unauthorized-access"
+
+  # ==========================================
+  # Performance Alerts
+  # ==========================================
+  - name: gasolinera-jsm-performance
+    interval: 60s
+    rules:
+      - alert: LowThroughput
+        expr: |
+          rate(http_requests_total[5m]) < 10
+        for: 10m
+        labels:
+          severity: warning
+          priority: P2
+          team: platform
+        annotations:
+          summary: "⚠️ Low throughput detected"
+          description: "Request rate is {{ $value }} req/sec for {{ $labels.service }} (expected: >10)"
+          runbook_url: "https://runbooks.gasolinera-jsm.com/low-throughput"
+
+      - alert: GarbageCollectionHigh
+        expr: |
+          rate(jvm_gc_collection_seconds_sum[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          priority: P2
+          team: platform
+        annotations:
+          summary: "⚠️ High garbage collection time"
+          description: "GC time is {{ $value }}s/sec for {{ $labels.service }}"
+          runbook_url: "https://runbooks.gasolinera-jsm.com/high-gc"
+
+      - alert: CacheHitRateLow
+        expr: |
+          (
+            rate(cache_hits_total[10m]) /
+            (rate(cache_hits_total[10m]) + rate(cache_misses_total[10m]))
+          ) * 100 < 80
+        for: 15m
+        labels:
+          severity: warning
+          priority: P2
+          team: platform
+        annotations:
+          summary: "⚠️ Low cache hit ratio: {{ $value }}%"
+          description: "Cache hit ratio is {{ $value }}% for {{ $labels.service }} (expected: >80%)"
+          runbook_url: "https://runbooks.gasolinera-jsm.com/low-cache-hit"
+
+  # ==========================================
+  # SLA/SLO Alerts
+  # ==========================================
+  - name: gasolinera-jsm-slo
+    interval: 300s # 5 minutes
+    rules:
+      - alert: SLOAvailabilityBreach
+        expr: |
+          (
+            (
+              rate(http_requests_total{status!~"5.."}[30m]) /
+              rate(http_requests_total[30m])
+            ) * 100
+          ) < 99.9
+        for: 5m
+        labels:
+          severity: critical
+          priority: P0
+          team: platform
+        annotations:
+          summary: "🚨 SLO availability breach: {{ $value }}%"
+          description: "Service availability is {{ $value }}% (SLO: 99.9%)"
+          runbook_url: "https://runbooks.gasolinera-jsm.com/slo-breach"
+
+      - alert: SLOLatencyBreach
+        expr: |
+          histogram_quantile(0.95,
+            rate(http_request_duration_seconds_bucket[30m])
+          ) > 0.2
+        for: 10m
+        labels:
+          severity: warning
+          priority: P1
+          team: platform
+        annotations:
+          summary: "⚠️ SLO latency breach: {{ $value }}s"
+          description: "95th percentile latency is {{ $value }}s (SLO: 0.2s)"
+          runbook_url: "https://runbooks.gasolinera-jsm.com/slo-latency-breach"
+
+  # ==========================================
+  # Predictive Alerts
+  # ==========================================
+  - name: gasolinera-jsm-predictive
+    interval: 300s
+    rules:
+      - alert: DiskSpaceWillFillIn4Hours
+        expr: |
+          predict_linear(
+            node_filesystem_avail_bytes{mountpoint="/"}[1h], 4*3600
+          ) < 0
+        for: 30m
+        labels:
+          severity: warning
+          priority: P1
+          team: platform
+        annotations:
+          summary: "⚠️ Disk space will be full in 4 hours"
+          description: "Disk on {{ $labels.instance }} will be full in approximately 4 hours"
+          runbook_url: "https://runbooks.gasolinera-jsm.com/disk-space-prediction"
+
+      - alert: MemoryLeakDetected
+        expr: |
+          increase(
+            container_memory_usage_bytes{container!="POD",container!=""}[1h]
+          ) > 100*1024*1024  # 100MB increase per hour
+        for: 2h
+        labels:
+          severity: warning
+          priority: P1
+          team: platform
+        annotations:
+          summary: "⚠️ Potential memory leak detected"
+          description: "Memory usage for {{ $labels.container }} increased by {{ $value }} bytes in the last hour"
+          runbook_url: "https://runbooks.gasolinera-jsm.com/memory-leak"
+
+  # ==========================================
+  # Custom Business Metrics Alerts
+  # ==========================================
+  - name: gasolinera-jsm-business-metrics
+    interval: 300s
+    rules:
+      - alert: DailyRevenueDropSignificant
+        expr: |
+          (
+            (
+              business_revenue_daily -
+              business_revenue_daily offset 1d
+            ) / business_revenue_daily offset 1d
+          ) * 100 < -20
+        for: 1h
+        labels:
+          severity: warning
+          priority: P1
+          team: business
+        annotations:
+          summary: "⚠️ Significant daily revenue drop: {{ $value }}%"
+          description: "Daily revenue dropped by {{ $value }}% compared to yesterday"
+          runbook_url: "https://runbooks.gasolinera-jsm.com/revenue-drop"
+
+      - alert: ActiveUsersDropSignificant
+        expr: |
+          (
+            (
+              business_users_active -
+              business_users_active offset 1d
+            ) / business_users_active offset 1d
+          ) * 100 < -15
+        for: 2h
+        labels:
+          severity: warning
+          priority: P2
+          team: business
+        annotations:
+          summary: "⚠️ Significant drop in active users: {{ $value }}%"
+          description: "Active users dropped by {{ $value }}% compared to yesterday"
+          runbook_url: "https://runbooks.gasolinera-jsm.com/user-drop"
+
+      - alert: CouponConversionRateLow
+        expr: |
+          business_coupon_conversion_rate < 0.6
+        for: 1h
+        labels:
+          severity: warning
+          priority: P2
+          team: business
+        annotations:
+          summary: "⚠️ Low coupon conversion rate: {{ $value }}"
+          description: "Coupon conversion rate is {{ $value }} (expected: >0.6)"
+          runbook_url: "https://runbooks.gasolinera-jsm.com/low-conversion"

@@ -1,0 +1,177 @@
+# Docker Compose override for development environment
+# This file contains development-specific configurations
+
+version: '3.8'
+
+services:
+  # Development overrides for application services
+  api-gateway:
+    environment:
+      SPRING_PROFILES_ACTIVE: docker,dev
+      LOGGING_LEVEL_ROOT: DEBUG
+      LOGGING_LEVEL_COM_GASOLINERAJSM: TRACE
+      MANAGEMENT_TRACING_SAMPLING_PROBABILITY: 1.0
+      JAVA_OPTS: -Xmx1024m -Xms512m -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005
+    ports:
+      - '8080:8080'
+      - '5005:5005' # Debug port
+    volumes:
+      - ./logs/api-gateway:/app/logs
+    networks:
+      - gasolinera-network
+
+  auth-service:
+    environment:
+      SPRING_PROFILES_ACTIVE: docker,dev
+      LOGGING_LEVEL_ROOT: DEBUG
+      LOGGING_LEVEL_COM_GASOLINERAJSM: TRACE
+      MANAGEMENT_TRACING_SAMPLING_PROBABILITY: 1.0
+      JAVA_OPTS: -Xmx512m -Xms256m -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5006
+    ports:
+      - '8081:8080'
+      - '5006:5006' # Debug port
+    volumes:
+      - ./logs/auth-service:/app/logs
+    networks:
+      - gasolinera-network
+
+  station-service:
+    environment:
+      SPRING_PROFILES_ACTIVE: docker,dev
+      LOGGING_LEVEL_ROOT: DEBUG
+      LOGGING_LEVEL_COM_GASOLINERAJSM: TRACE
+      MANAGEMENT_TRACING_SAMPLING_PROBABILITY: 1.0
+      JAVA_OPTS: -Xmx512m -Xms256m -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5007
+    ports:
+      - '8083:8080'
+      - '5007:5007' # Debug port
+    volumes:
+      - ./logs/station-service:/app/logs
+    networks:
+      - gasolinera-network
+
+  coupon-service:
+    environment:
+      SPRING_PROFILES_ACTIVE: docker,dev
+      LOGGING_LEVEL_ROOT: DEBUG
+      LOGGING_LEVEL_COM_GASOLINERAJSM: TRACE
+      MANAGEMENT_TRACING_SAMPLING_PROBABILITY: 1.0
+      JAVA_OPTS: -Xmx512m -Xms256m -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5008
+    ports:
+      - '8086:8080'
+      - '5008:5008' # Debug port
+    volumes:
+      - ./logs/coupon-service:/app/logs
+    networks:
+      - gasolinera-network
+
+  redemption-service:
+    environment:
+      SPRING_PROFILES_ACTIVE: docker,dev
+      LOGGING_LEVEL_ROOT: DEBUG
+      LOGGING_LEVEL_COM_GASOLINERAJSM: TRACE
+      MANAGEMENT_TRACING_SAMPLING_PROBABILITY: 1.0
+      JAVA_OPTS: -Xmx512m -Xms256m -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5009
+    ports:
+      - '8082:8080'
+      - '5009:5009' # Debug port
+    volumes:
+      - ./logs/redemption-service:/app/logs
+    networks:
+      - gasolinera-network
+
+  ad-engine:
+    environment:
+      SPRING_PROFILES_ACTIVE: docker,dev
+      LOGGING_LEVEL_ROOT: DEBUG
+      LOGGING_LEVEL_COM_GASOLINERAJSM: TRACE
+      MANAGEMENT_TRACING_SAMPLING_PROBABILITY: 1.0
+      JAVA_OPTS: -Xmx512m -Xms256m -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5010
+    ports:
+      - '8084:8080'
+      - '5010:5010' # Debug port
+    volumes:
+      - ./logs/ad-engine:/app/logs
+    networks:
+      - gasolinera-network
+
+  raffle-service:
+    environment:
+      SPRING_PROFILES_ACTIVE: docker,dev
+      LOGGING_LEVEL_ROOT: DEBUG
+      LOGGING_LEVEL_COM_GASOLINERAJSM: TRACE
+      MANAGEMENT_TRACING_SAMPLING_PROBABILITY: 1.0
+      JAVA_OPTS: -Xmx512m -Xms256m -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5011
+    ports:
+      - '8085:8080'
+      - '5011:5011' # Debug port
+    volumes:
+      - ./logs/raffle-service:/app/logs
+    networks:
+      - gasolinera-network
+
+  # Development database with exposed port and logging
+  postgres:
+    ports:
+      - '5432:5432'
+    environment:
+      POSTGRES_LOG_STATEMENT: all
+      POSTGRES_LOG_MIN_DURATION_STATEMENT: 0
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./logs/postgres:/var/log/postgresql
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    networks:
+      - gasolinera-network
+
+  # Development Redis with exposed port
+  redis:
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis_data:/data
+      - ./logs/redis:/var/log/redis
+    networks:
+      - gasolinera-network
+
+  # Development RabbitMQ with management interface
+  rabbitmq:
+    ports:
+      - '5672:5672'
+      - '15672:15672'
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+      - ./logs/rabbitmq:/var/log/rabbitmq
+      - ./config/rabbitmq/definitions.json:/etc/rabbitmq/definitions.json
+    networks:
+      - gasolinera-network
+
+  # Development Vault with exposed port
+  vault:
+    ports:
+      - '8200:8200'
+      - '8201:8201'
+    volumes:
+      - vault_data:/vault/data
+      - ./logs/vault:/vault/logs
+    networks:
+      - gasolinera-network
+
+  # Development Jaeger with all ports exposed
+  jaeger:
+    ports:
+      - '16686:16686' # UI
+      - '14268:14268' # HTTP collector
+      - '4317:4317' # OTLP gRPC
+      - '4318:4318' # OTLP HTTP
+      - '6831:6831/udp' # Jaeger agent
+      - '6832:6832/udp' # Jaeger agent
+    networks:
+      - gasolinera-network
+
+networks:
+  gasolinera-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

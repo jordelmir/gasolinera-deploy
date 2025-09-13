@@ -1,0 +1,116 @@
+# Configuración de logging para diferentes ambientes
+
+# Configuración base
+gasolinera:
+  logging:
+    level: INFO
+    format: JSON
+    mdc:
+      enabled: true
+      includeUserId: true
+      includeSessionId: true
+      includeTraceId: true
+      includeSpanId: true
+    correlation:
+      headerName: 'X-Correlation-ID'
+      mdcKey: 'correlationId'
+      generateIfMissing: true
+      includeInResponse: true
+    business:
+      enabled: true
+      includeUserActions: true
+      includeCouponOperations: true
+      includeRedemptionOperations: true
+      includeRaffleOperations: true
+      includeStationOperations: true
+    elk:
+      enabled: false
+      host: localhost
+      port: 9200
+      index: gasolinera-logs
+
+---
+# Configuración para desarrollo
+spring:
+  config:
+    activate:
+      on-profile: dev
+
+gasolinera:
+  logging:
+    level: DEBUG
+    elk:
+      enabled: false
+
+logging:
+  level:
+    com.gasolinerajsm: DEBUG
+    org.springframework.security: DEBUG
+    org.springframework.web: DEBUG
+
+---
+# Configuración para testing
+spring:
+  config:
+    activate:
+      on-profile: test
+
+gasolinera:
+  logging:
+    level: WARN
+    mdc:
+      enabled: false
+    business:
+      enabled: false
+
+logging:
+  level:
+    com.gasolinerajsm: WARN
+    org.springframework: WARN
+    org.hibernate: WARN
+
+---
+# Configuración para staging
+spring:
+  config:
+    activate:
+      on-profile: staging
+
+gasolinera:
+  logging:
+    level: INFO
+    elk:
+      enabled: true
+      host: ${ELK_HOST:localhost}
+      port: ${ELK_PORT:9200}
+
+logging:
+  level:
+    com.gasolinerajsm: INFO
+    org.springframework: WARN
+
+---
+# Configuración para producción
+spring:
+  config:
+    activate:
+      on-profile: prod
+
+gasolinera:
+  logging:
+    level: WARN
+    elk:
+      enabled: true
+      host: ${ELK_HOST:elasticsearch-cluster}
+      port: ${ELK_PORT:9200}
+      username: ${ELK_USERNAME:}
+      password: ${ELK_PASSWORD:}
+
+logging:
+  level:
+    com.gasolinerajsm: INFO
+    org.springframework: WARN
+    org.hibernate: WARN
+    com.zaxxer.hikari: WARN
+    org.apache.kafka: WARN
+    io.micrometer: WARN

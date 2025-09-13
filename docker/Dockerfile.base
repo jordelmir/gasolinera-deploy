@@ -1,0 +1,61 @@
+# Base Dockerfile template for Gasolinera JSM services
+# This file serves as a template for creating optimized multi-stage builds
+
+# Build stage - Use specific Gradle version with JDK 17
+FROM gradle:8.8.0-jdk17-alpine AS builder
+
+# Set working directory
+WORKDIR /app
+
+# Create non-root user for security
+RUN addgroup -g 1001 -S gradle && \
+    adduser -S gradle -u 1001 -G gradle
+
+# Copy dependency files first for better layer caching
+COPY --chown=gradle:gradle build.gradle.kts settings.gradle.kts gradle.properties ./
+COPY --chown=gradle:gradle gradle/ ./gradle/
+
+# Copy shared modules build files
+COPY --chown=gradle:gradle shared/common/build.gradle.kts ./shared/common/
+COPY --chown=gradle:gradle shared/messaging/build.gradle.kts ./shared/messaging/
+COPY --chown=gradle:gradle shared/security/build.gradle.kts ./shared/security/
+
+# Download dependencies (this layer will be cached if dependencies don't change)
+RUN gradle dependencies --no-daemon
+
+# Copy shared modules source code
+COPY --chown=gradle:gradle shared/ ./shared/
+
+# Copy service-specific build file (to be replaced in each service Dockerfile)
+# COPY --chown=gradle:gradle services/SERVICE_NAME/build.gradle.kts ./services/SERVICE_NAME/
+
+# Copy service source code (to be replaced in each service Dockerfile)
+# COPY --chown=gradle:gradle services/SERVICE_NAME/src ./services/SERVICE_NAME/src
+
+# Build the application (to be replaced in each service Dockerfile)
+# RUN gradle :services:SERVICE_NAME:build -x test --no-daemon --parallel
+
+# Runtime stage - Use distroless for security and minimal size
+FROM gcr.io/distroless/java17-debian12:nonroot AS runtime
+
+# Set working directory
+WORKDIR /app
+
+# Copy the built JAR from builder stage (to be replaced in each service Dockerfile)
+# COPY --from=builder /app/services/SERVICE_NAME/build/libs/*.jar app.jar
+
+# Use non-root user
+USER nonroot:nonroot
+
+# Expose port
+EXPOSE 8080
+
+# Health check (to be customized per service)
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:8080/actuator/health || exit 1
+
+# Set JVM options for containerized environment
+ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:+UseG1GC -XX:+UseStringDeduplication"
+
+# Run the application
+ENTRYPOINT ["java", "-jar", "app.jar"]

@@ -1,0 +1,173 @@
+# Jaeger Configuration for Gasolinera JSM
+# Production-ready configuration for distributed tracing
+
+# Jaeger Collector Configuration
+collector:
+  # gRPC server configuration
+  grpc-server:
+    host-port: 0.0.0.0:14250
+
+  # HTTP server configuration
+  http-server:
+    host-port: 0.0.0.0:14268
+
+  # Zipkin compatibility
+  zipkin:
+    host-port: 0.0.0.0:9411
+
+  # OTLP receiver configuration
+  otlp:
+    grpc:
+      host-port: 0.0.0.0:4317
+    http:
+      host-port: 0.0.0.0:4318
+
+# Jaeger Query Configuration
+query:
+  # Base path for Jaeger UI
+  base-path: /
+
+  # Static files path
+  static-files: /go/jaeger-ui/
+
+  # UI configuration
+  ui-config: /etc/jaeger/ui-config.json
+
+  # Additional UI options
+  query:
+    max-clock-skew-adjustment: 0s
+
+# Storage Configuration
+storage:
+  type: elasticsearch
+
+  elasticsearch:
+    server-urls: http://elasticsearch:9200
+    index-prefix: jaeger
+    username: ""
+    password: ""
+
+    # Index settings
+    create-index-templates: true
+    version: 7
+
+    # Shards and replicas
+    num-shards: 1
+    num-replicas: 0
+
+    # Bulk processing
+    bulk:
+      size: 5000000  # 5MB
+      workers: 1
+      actions: 1000
+      flush-interval: 200ms
+
+    # Index rollover
+    index-rollover-frequency-spans: 24h
+    index-rollover-frequency-services: 24h
+    index-rollover-frequency-dependencies: 24h
+
+    # Retention policy
+    max-span-age: 168h  # 7 days
+
+    # Tags configuration
+    tags-as-fields:
+      all: false
+      include: "http.status_code,error,business.operation.type,user.id,station.id"
+
+    # Adaptive sampling
+    adaptive-sampling:
+      sampling-store-type: elasticsearch
+
+# Agent Configuration (for sidecar deployment)
+agent:
+  # Jaeger agent server configuration
+  jaeger:
+    grpc-server:
+      host-port: 0.0.0.0:14250
+    thrift-server:
+      host-port: 0.0.0.0:14267
+
+  # Processor configuration
+  processor:
+    jaeger-binary:
+      server-max-packet-size: 65000
+      server-host-port: 0.0.0.0:6832
+      server-queue-size: 1000
+      workers: 10
+
+    jaeger-compact:
+      server-max-packet-size: 65000
+      server-host-port: 0.0.0.0:6831
+      server-queue-size: 1000
+      workers: 10
+
+# Sampling Configuration
+sampling:
+  # Default sampling strategy
+  default-strategy:
+    type: probabilistic
+    param: 0.1  # 10% sampling
+
+  # Per-service sampling strategies
+  per-service-strategies:
+    - service: "auth-service"
+      type: probabilistic
+      param: 0.2  # 20% sampling for auth service
+
+    - service: "coupon-service"
+      type: probabilistic
+      param: 0.15  # 15% sampling for coupon service
+
+    - service: "raffle-service"
+      type: probabilistic
+      param: 0.1   # 10% sampling for raffle service
+
+    - service: "station-service"
+      type: probabilistic
+      param: 0.1   # 10% sampling for station service
+
+    - service: "redemption-service"
+      type: probabilistic
+      param: 0.15  # 15% sampling for redemption service
+
+    - service: "ad-engine"
+      type: probabilistic
+      param: 0.05  # 5% sampling for ad engine
+
+  # Per-operation sampling strategies
+  per-operation-strategies:
+    - service: "coupon-service"
+      operation: "coupon.use"
+      type: probabilistic
+      param: 0.5  # 50% sampling for coupon usage
+
+    - service: "raffle-service"
+      operation: "raffle.draw"
+      type: probabilistic
+      param: 1.0  # 100% sampling for raffle draws
+
+    - service: "auth-service"
+      operation: "user.login"
+      type: probabilistic
+      param: 0.3  # 30% sampling for login operations
+
+# Metrics Configuration
+metrics:
+  backend: prometheus
+  http-route: /metrics
+
+  # Prometheus configuration
+  prometheus:
+    namespace: jaeger
+
+  # Additional metrics
+  factory: prometheus
+
+# Logging Configuration
+log-level: info
+
+# Health Check Configuration
+admin:
+  http:
+    host-port: 0.0.0.0:14269

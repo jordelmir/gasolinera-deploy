@@ -1,0 +1,15 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+echo "🔍 Running pre-commit quality checks..."
+
+# Run auto-fix first to resolve simple issues
+echo "🔧 Auto-fixing common issues..."
+./scripts/auto-fix.sh
+
+# Run comprehensive quality checks
+echo "🧪 Running quality checks..."
+./scripts/quality-check.sh
+
+# If we get here, all checks passed
+echo "✅ Pre-commit checks passed! Ready to commit."

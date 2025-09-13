@@ -1,0 +1,278 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-config
+  namespace: gasolinera-jsm
+  labels:
+    app: postgres
+    component: database
+data:
+  postgresql.conf: |
+    # PostgreSQL Kubernetes Configuration
+    listen_addresses = '*'
+    port = 5432
+    max_connections = 200
+    shared_buffers = 512MB
+    effective_cache_size = 2GB
+    maintenance_work_mem = 128MB
+    checkpoint_completion_target = 0.9
+    wal_buffers = 32MB
+    default_statistics_target = 100
+    random_page_cost = 1.1
+    effective_io_concurrency = 200
+    work_mem = 8MB
+    wal_level = replica
+    max_wal_senders = 10
+    hot_standby = on
+    logging_collector = on
+    log_directory = '/var/log/postgresql'
+    log_filename = 'postgresql-%Y-%m-%d_%H%M%S.log'
+    log_min_duration_statement = 1000
+    log_checkpoints = on
+    log_connections = on
+    log_disconnections = on
+    shared_preload_libraries = 'pg_stat_statements'
+
+  pg_hba.conf: |
+    # PostgreSQL Client Authentication Configuration
+    local   all             postgres                                peer
+    local   all             all                                     scram-sha-256
+    host    all             postgres        127.0.0.1/32            scram-sha-256
+    host    gasolinera_jsm  gasolinera_user 10.0.0.0/8             scram-sha-256
+    host    replication     replica_user    10.0.0.0/8             scram-sha-256
+    hostssl gasolinera_jsm  gasolinera_user 0.0.0.0/0              scram-sha-256
+    hostssl replication     replica_user    0.0.0.0/0              scram-sha-256
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: redis-config
+  namespace: gasolinera-jsm
+  labels:
+    app: redis
+    component: cache
+data:
+  redis.conf: |
+    # Redis Kubernetes Configuration
+    port 6379
+    bind 0.0.0.0
+    protected-mode yes
+    tcp-backlog 511
+    timeout 0
+    tcp-keepalive 300
+    daemonize no
+    supervised no
+    loglevel notice
+    databases 16
+    save 900 1
+    save 300 10
+    save 60 10000
+    stop-writes-on-bgsave-error yes
+    rdbcompression yes
+    rdbchecksum yes
+    dbfilename dump.rdb
+    dir /data
+    replica-serve-stale-data yes
+    replica-read-only yes
+    maxmemory 1gb
+    maxmemory-policy allkeys-lru
+    appendonly yes
+    appendfilename "appendonly.aof"
+    appendfsync everysec
+    auto-aof-rewrite-percentage 100
+    auto-aof-rewrite-min-size 64mb
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rabbitmq-config
+  namespace: gasolinera-jsm
+  labels:
+    app: rabbitmq
+    component: messaging
+data:
+  rabbitmq.conf: |
+    # RabbitMQ Kubernetes Configuration
+    listeners.tcp.default = 5672
+    management.tcp.port = 15672
+    log.console = false
+    log.file = /var/log/rabbitmq/rabbit.log
+    log.file.level = info
+    vm_memory_high_watermark.relative = 0.6
+    disk_free_limit.relative = 2.0
+    heartbeat = 60
+    frame_max = 131072
+    channel_max = 2047
+    connection_max = 1000
+    default_vhost = gasolinera_vhost
+    cluster_formation.peer_discovery_backend = k8s
+    cluster_formation.k8s.host = kubernetes.default.svc.cluster.local
+    cluster_formation.k8s.address_type = hostname
+    cluster_formation.k8s.service_name = rabbitmq-headless
+    cluster_formation.k8s.hostname_suffix = .rabbitmq-headless.gasolinera-jsm.svc.cluster.local
+    cluster_partition_handling = autoheal
+    queue_master_locator = balanced
+
+  enabled_plugins: |
+    [rabbitmq_management,rabbitmq_management_agent,rabbitmq_web_dispatch,rabbitmq_prometheus,rabbitmq_peer_discovery_k8s].
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: application-config
+  namespace: gasolinera-jsm
+  labels:
+    app: gasolinera-jsm
+    component: application
+data:
+  application-k8s.yml: |
+    spring:
+      profiles:
+        active: k8s,prod
+      datasource:
+        url: jdbc:postgresql://postgres-primary:5432/gasolinera_jsm
+        username: ${POSTGRES_USERNAME}
+        password: ${POSTGRES_PASSWORD}
+        hikari:
+          maximum-pool-size: 20
+          minimum-idle: 5
+          connection-timeout: 30000
+          idle-timeout: 600000
+          max-lifetime: 1800000
+      redis:
+        host: redis-primary
+        port: 6379
+        password: ${REDIS_PASSWORD}
+        timeout: 5000ms
+        lettuce:
+          pool:
+            max-active: 10
+            max-idle: 5
+            min-idle: 1
+      rabbitmq:
+        host: rabbitmq
+        port: 5672
+        username: ${RABBITMQ_USERNAME}
+        password: ${RABBITMQ_PASSWORD}
+        virtual-host: gasolinera_vhost
+
+    management:
+      endpoints:
+        web:
+          exposure:
+            include: health,info,metrics,prometheus
+      endpoint:
+        health:
+          show-details: when-authorized
+      metrics:
+        export:
+          prometheus:
+            enabled: true
+
+    logging:
+      level:
+        com.gasolinerajsm: INFO
+        org.springframework: WARN
+        org.hibernate: WARN
+      pattern:
+        console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level [%X{traceId:-},%X{spanId:-}] %logger{36} - %msg%n"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: gasolinera-jsm
+  labels:
+    app: prometheus
+    component: monitoring
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s
+      evaluation_interval: 15s
+      external_labels:
+        cluster: 'gasolinera-k8s'
+        environment: 'production'
+
+    rule_files:
+      - "/etc/prometheus/rules/*.yml"
+
+    scrape_configs:
+      - job_name: 'prometheus'
+        static_configs:
+          - targets: ['localhost:9090']
+
+      - job_name: 'kubernetes-apiservers'
+        kubernetes_sd_configs:
+        - role: endpoints
+        scheme: https
+        tls_config:
+          ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+        bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+        relabel_configs:
+        - source_labels: [__meta_kubernetes_namespace, __meta_kubernetes_service_name, __meta_kubernetes_endpoint_port_name]
+          action: keep
+          regex: default;kubernetes;https
+
+      - job_name: 'kubernetes-nodes'
+        kubernetes_sd_configs:
+        - role: node
+        scheme: https
+        tls_config:
+          ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+        bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+        relabel_configs:
+        - action: labelmap
+          regex: __meta_kubernetes_node_label_(.+)
+
+      - job_name: 'gasolinera-services'
+        kubernetes_sd_configs:
+        - role: endpoints
+          namespaces:
+            names:
+            - gasolinera-jsm
+        relabel_configs:
+        - source_labels: [__meta_kubernetes_service_annotation_prometheus_io_scrape]
+          action: keep
+          regex: true
+        - source_labels: [__meta_kubernetes_service_annotation_prometheus_io_path]
+          action: replace
+          target_label: __metrics_path__
+          regex: (.+)
+        - source_labels: [__address__, __meta_kubernetes_service_annotation_prometheus_io_port]
+          action: replace
+          regex: ([^:]+)(?::\d+)?;(\d+)
+          replacement: $1:$2
+          target_label: __address__
+        - action: labelmap
+          regex: __meta_kubernetes_service_label_(.+)
+        - source_labels: [__meta_kubernetes_namespace]
+          action: replace
+          target_label: kubernetes_namespace
+        - source_labels: [__meta_kubernetes_service_name]
+          action: replace
+          target_label: kubernetes_name
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-datasources
+  namespace: gasolinera-jsm
+  labels:
+    app: grafana
+    component: monitoring
+data:
+  datasources.yml: |
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        type: prometheus
+        access: proxy
+        url: http://prometheus:9090
+        isDefault: true
+        editable: true
+      - name: Jaeger
+        type: jaeger
+        access: proxy
+        url: http://jaeger-query:16686
+        editable: true

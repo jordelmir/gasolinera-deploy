@@ -1,0 +1,166 @@
+# Gasolinera JSM Platform - Infrastructure Management Makefile
+
+.PHONY: help build up down logs clean test health init-vault init-db setup-dev
+
+# Default environment
+ENV ?= development
+
+# Docker Compose files
+COMPOSE_FILE = docker-compose.yml
+COMPOSE_ENV_FILE = .env.$(ENV)
+
+help: ## Show this help message
+	@echo "Gasolinera JSM Platform - Infrastructure Management"
+	@echo "=================================================="
+	@echo ""
+	@echo "Available commands:"
+	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+
+build: ## Build all Docker images
+	@echo "Building Docker images for Gasolinera JSM Platform..."
+	docker-compose -f $(COMPOSE_FILE) --env-file $(COMPOSE_ENV_FILE) build --no-cache
+
+up: ## Start all services
+	@echo "Starting Gasolinera JSM Platform services..."
+	docker-compose -f $(COMPOSE_FILE) --env-file $(COMPOSE_ENV_FILE) up -d
+
+up-build: ## Build and start all services
+	@echo "Building and starting Gasolinera JSM Platform services..."
+	docker-compose -f $(COMPOSE_FILE) --env-file $(COMPOSE_ENV_FILE) up -d --build
+
+down: ## Stop all services
+	@echo "Stopping Gasolinera JSM Platform services..."
+	docker-compose -f $(COMPOSE_FILE) --env-file $(COMPOSE_ENV_FILE) down
+
+down-volumes: ## Stop all services and remove volumes
+	@echo "Stopping services and removing volumes..."
+	docker-compose -f $(COMPOSE_FILE) --env-file $(COMPOSE_ENV_FILE) down -v
+
+logs: ## Show logs for all services
+	docker-compose -f $(COMPOSE_FILE) --env-file $(COMPOSE_ENV_FILE) logs -f
+
+logs-service: ## Show logs for specific service (usage: make logs-service SERVICE=auth-service)
+	@if [ -z "$(SERVICE)" ]; then \
+		echo "Please specify SERVICE. Example: make logs-service SERVICE=auth-service"; \
+		exit 1; \
+	fi
+	docker-compose -f $(COMPOSE_FILE) --env-file $(COMPOSE_ENV_FILE) logs -f $(SERVICE)
+
+health: ## Check health status of all services
+	@echo "Checking health status of all services..."
+	@echo "========================================"
+	@docker-compose -f $(COMPOSE_FILE) --env-file $(COMPOSE_ENV_FILE) ps
+	@echo ""
+	@echo "Service Health Checks:"
+	@echo "====================="
+	@curl -s http://localhost:8080/actuator/health 2>/dev/null | jq '.status // "UNKNOWN"' | xargs echo "API Gateway:"
+	@curl -s http://localhost:8081/actuator/health 2>/dev/null | jq '.status // "UNKNOWN"' | xargs echo "Auth Service:"
+	@curl -s http://localhost:8082/actuator/health 2>/dev/null | jq '.status // "UNKNOWN"' | xargs echo "Redemption Service:"
+	@curl -s http://localhost:8083/actuator/health 2>/dev/null | jq '.status // "UNKNOWN"' | xargs echo "Station Service:"
+	@curl -s http://localhost:8084/actuator/health 2>/dev/null | jq '.status // "UNKNOWN"' | xargs echo "Ad Engine:"
+	@curl -s http://localhost:8085/actuator/health 2>/dev/null | jq '.status // "UNKNOWN"' | xargs echo "Raffle Service:"
+	@curl -s http://localhost:8086/actuator/health 2>/dev/null | jq '.status // "UNKNOWN"' | xargs echo "Coupon Service:"
+
+init-vault: ## Initialize Vault with secrets and policies
+	@echo "Initializing HashiCorp Vault..."
+	docker-compose -f $(COMPOSE_FILE) --env-file $(COMPOSE_ENV_FILE) exec vault /vault/scripts/vault-init.sh
+
+init-db: ## Initialize database schemas and users
+	@echo "Database initialization is handled automatically on startup"
+	@echo "Check logs with: make logs-service SERVICE=postgres"
+
+init-rabbitmq: ## Initialize RabbitMQ exchanges and queues
+	@echo "Initializing RabbitMQ..."
+	docker-compose -f $(COMPOSE_FILE) --env-file $(COMPOSE_ENV_FILE) exec rabbitmq /docker-entrypoint-initdb.d/rabbitmq-init.sh
+
+setup-dev: ## Complete development environment setup
+	@echo "Setting up complete development environment..."
+	@echo "============================================="
+	@echo "1. Building images..."
+	@make build
+	@echo "2. Starting infrastructure services..."
+	@make up
+	@echo "3. Waiting for services to be ready..."
+	@sleep 30
+	@echo "4. Initializing Vault..."
+	@make init-vault
+	@echo "5. Initializing RabbitMQ..."
+	@make init-rabbitmq
+	@echo "6. Checking health..."
+	@make health
+	@echo ""
+	@echo "Development environment setup complete!"
+	@echo "======================================"
+	@echo "Access points:"
+	@echo "- API Gateway: http://localhost:8080"
+	@echo "- Jaeger UI: http://localhost:16686"
+	@echo "- RabbitMQ Management: http://localhost:15672 (user: gasolinera_user, pass: rabbitmq_pass_2024)"
+	@echo "- Vault UI: http://localhost:8200 (token: gasolinera_vault_token_2024)"
+
+clean: ## Clean up Docker resources
+	@echo "Cleaning up Docker resources..."
+	docker-compose -f $(COMPOSE_FILE) --env-file $(COMPOSE_ENV_FILE) down -v --remove-orphans
+	docker system prune -f
+	docker volume prune -f
+
+test-infrastructure: ## Test infrastructure connectivity
+	@echo "Testing infrastructure connectivity..."
+	@echo "===================================="
+	@echo "Testing PostgreSQL connection..."
+	@docker-compose -f $(COMPOSE_FILE) --env-file $(COMPOSE_ENV_FILE) exec postgres pg_isready -U gasolinera_user -d gasolinera_jsm
+	@echo "Testing Redis connection..."
+	@docker-compose -f $(COMPOSE_FILE) --env-file $(COMPOSE_ENV_FILE) exec redis redis-cli ping
+	@echo "Testing RabbitMQ connection..."
+	@docker-compose -f $(COMPOSE_FILE) --env-file $(COMPOSE_ENV_FILE) exec rabbitmq rabbitmqctl status
+	@echo "Testing Vault connection..."
+	@docker-compose -f $(COMPOSE_FILE) --env-file $(COMPOSE_ENV_FILE) exec vault vault status
+	@echo "All infrastructure services are healthy!"
+
+restart: ## Restart all services
+	@echo "Restarting all services..."
+	@make down
+	@make up
+
+restart-service: ## Restart specific service (usage: make restart-service SERVICE=auth-service)
+	@if [ -z "$(SERVICE)" ]; then \
+		echo "Please specify SERVICE. Example: make restart-service SERVICE=auth-service"; \
+		exit 1; \
+	fi
+	docker-compose -f $(COMPOSE_FILE) --env-file $(COMPOSE_ENV_FILE) restart $(SERVICE)
+
+shell: ## Open shell in specific service (usage: make shell SERVICE=auth-service)
+	@if [ -z "$(SERVICE)" ]; then \
+		echo "Please specify SERVICE. Example: make shell SERVICE=auth-service"; \
+		exit 1; \
+	fi
+	docker-compose -f $(COMPOSE_FILE) --env-file $(COMPOSE_ENV_FILE) exec $(SERVICE) /bin/bash
+
+backup-db: ## Backup PostgreSQL database
+	@echo "Creating database backup..."
+	docker-compose -f $(COMPOSE_FILE) --env-file $(COMPOSE_ENV_FILE) exec postgres pg_dump -U gasolinera_user gasolinera_jsm > backup_$(shell date +%Y%m%d_%H%M%S).sql
+	@echo "Database backup created: backup_$(shell date +%Y%m%d_%H%M%S).sql"
+
+restore-db: ## Restore PostgreSQL database (usage: make restore-db BACKUP_FILE=backup.sql)
+	@if [ -z "$(BACKUP_FILE)" ]; then \
+		echo "Please specify BACKUP_FILE. Example: make restore-db BACKUP_FILE=backup.sql"; \
+		exit 1; \
+	fi
+	@echo "Restoring database from $(BACKUP_FILE)..."
+	docker-compose -f $(COMPOSE_FILE) --env-file $(COMPOSE_ENV_FILE) exec -T postgres psql -U gasolinera_user gasolinera_jsm < $(BACKUP_FILE)
+
+monitor: ## Open monitoring dashboard
+	@echo "Opening monitoring dashboards..."
+	@echo "Jaeger Tracing: http://localhost:16686"
+	@echo "RabbitMQ Management: http://localhost:15672"
+	@echo "Vault UI: http://localhost:8200"
+	@if command -v open >/dev/null 2>&1; then \
+		open http://localhost:16686; \
+		open http://localhost:15672; \
+		open http://localhost:8200; \
+	elif command -v xdg-open >/dev/null 2>&1; then \
+		xdg-open http://localhost:16686; \
+		xdg-open http://localhost:15672; \
+		xdg-open http://localhost:8200; \
+	else \
+		echo "Please open the URLs manually in your browser"; \
+	fi

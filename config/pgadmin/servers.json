@@ -1,0 +1,30 @@
+{
+  "Servers": {
+    "1": {
+      "Name": "Gasolinera JSM Development",
+      "Group": "Development",
+      "Host": "postgres",
+      "Port": 5432,
+      "MaintenanceDB": "gasolinera_jsm_dev",
+      "Username": "gasolinera_dev",
+      "Password": "dev_password_2024",
+      "SSLMode": "prefer",
+      "SSLCert": "<STORAGE_DIR>/.postgresql/postgresql.crt",
+      "SSLKey": "<STORAGE_DIR>/.postgresql/postgresql.key",
+      "SSLRootCert": "<STORAGE_DIR>/.postgresql/root.crt",
+      "SSLCrl": "<STORAGE_DIR>/.postgresql/root.crl",
+      "SSLCompression": 0,
+      "Timeout": 10,
+      "UseSSHTunnel": 0,
+      "TunnelHost": "",
+      "TunnelPort": "22",
+      "TunnelUsername": "",
+      "TunnelAuthentication": 0,
+      "BGColor": "#3498db",
+      "FGColor": "#ffffff",
+      "Service": "",
+      "Shared": false,
+      "SharedUsername": ""
+    }
+  }
+}

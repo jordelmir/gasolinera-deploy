@@ -1,0 +1,262 @@
+# Configuración de health checks para diferentes ambientes
+
+# Configuración base
+gasolinera:
+  health:
+    enabled: true
+    database:
+      enabled: true
+      timeout: 5s
+      validationQuery: 'SELECT 1'
+      connectionPoolThreshold: 80
+      slowQueryThreshold: 2s
+    redis:
+      enabled: true
+      timeout: 3s
+      testKey: 'health:check'
+      memoryThreshold: 85
+    business:
+      enabled: true
+      checkCriticalOperations: true
+      errorRateThreshold: 0.05
+      responseTimeThreshold: 5s
+    externalServices:
+      enabled: true
+      timeout: 10s
+      services: {}
+    systemResources:
+      enabled: true
+      cpuThreshold: 80.0
+      memoryThreshold: 85.0
+      diskThreshold: 90.0
+      checkInterval: 1m
+    kubernetes:
+      readiness:
+        enabled: true
+        initialDelaySeconds: 30
+        periodSeconds: 10
+        timeoutSeconds: 5
+        failureThreshold: 3
+        successThreshold: 1
+      liveness:
+        enabled: true
+        initialDelaySeconds: 60
+        periodSeconds: 30
+        timeoutSeconds: 10
+        failureThreshold: 3
+        successThreshold: 1
+
+# Configuración de Spring Boot Actuator
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: always
+      show-components: always
+      probes:
+        enabled: true
+  health:
+    defaults:
+      enabled: true
+    db:
+      enabled: true
+    redis:
+      enabled: true
+    diskspace:
+      enabled: true
+    ping:
+      enabled: true
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+        gasolinera.health.check.duration: true
+
+---
+# Configuración para desarrollo
+spring:
+  config:
+    activate:
+      on-profile: dev
+
+gasolinera:
+  health:
+    database:
+      timeout: 10s
+      connectionPoolThreshold: 70
+    redis:
+      timeout: 5s
+      memoryThreshold: 90
+    business:
+      errorRateThreshold: 0.1
+      responseTimeThreshold: 10s
+    systemResources:
+      cpuThreshold: 90.0
+      memoryThreshold: 90.0
+      diskThreshold: 95.0
+      checkInterval: 30s
+
+management:
+  endpoint:
+    health:
+      show-details: always
+
+---
+# Configuración para testing
+spring:
+  config:
+    activate:
+      on-profile: test
+
+gasolinera:
+  health:
+    enabled: false
+    database:
+      enabled: false
+    redis:
+      enabled: false
+    business:
+      enabled: false
+    externalServices:
+      enabled: false
+    systemResources:
+      enabled: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+
+---
+# Configuración para staging
+spring:
+  config:
+    activate:
+      on-profile: staging
+
+gasolinera:
+  health:
+    database:
+      connectionPoolThreshold: 75
+    redis:
+      memoryThreshold: 80
+    business:
+      errorRateThreshold: 0.03
+    systemResources:
+      cpuThreshold: 75.0
+      memoryThreshold: 80.0
+      diskThreshold: 85.0
+    externalServices:
+      services:
+        payment-gateway:
+          url: 'https://staging-payment.example.com/health'
+          timeout: 5s
+          critical: true
+          expectedStatus: 200
+        notification-service:
+          url: 'https://staging-notifications.example.com/health'
+          timeout: 3s
+          critical: false
+          expectedStatus: 200
+
+---
+# Configuración para producción
+spring:
+  config:
+    activate:
+      on-profile: prod
+
+gasolinera:
+  health:
+    database:
+      timeout: 3s
+      connectionPoolThreshold: 70
+      slowQueryThreshold: 1s
+    redis:
+      timeout: 2s
+      memoryThreshold: 75
+    business:
+      errorRateThreshold: 0.02
+      responseTimeThreshold: 3s
+    systemResources:
+      cpuThreshold: 70.0
+      memoryThreshold: 75.0
+      diskThreshold: 80.0
+      checkInterval: 2m
+    externalServices:
+      timeout: 5s
+      services:
+        payment-gateway:
+          url: 'https://payment.example.com/health'
+          timeout: 3s
+          critical: true
+          expectedStatus: 200
+          headers:
+            Authorization: 'Bearer ${PAYMENT_GATEWAY_TOKEN:}'
+        notification-service:
+          url: 'https://notifications.example.com/health'
+          timeout: 2s
+          critical: false
+          expectedStatus: 200
+        analytics-service:
+          url: 'https://analytics.example.com/health'
+          timeout: 5s
+          critical: false
+          expectedStatus: 200
+
+management:
+  endpoint:
+    health:
+      show-details: when-authorized
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+
+---
+# Configuración para Kubernetes
+spring:
+  config:
+    activate:
+      on-profile: k8s
+
+gasolinera:
+  health:
+    kubernetes:
+      readiness:
+        initialDelaySeconds: 45
+        periodSeconds: 15
+        failureThreshold: 5
+      liveness:
+        initialDelaySeconds: 90
+        periodSeconds: 45
+        failureThreshold: 5
+
+management:
+  server:
+    port: 8081
+  endpoints:
+    web:
+      base-path: /actuator
+      exposure:
+        include: '*'
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      group:
+        readiness:
+          include: 'readinessState,db,redis,business'
+        liveness:
+          include: 'livenessState,ping'

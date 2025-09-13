@@ -1,0 +1,115 @@
+version: '3.8'
+
+services:
+  # Elasticsearch para almacenamiento de logs
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+    container_name: gasolinera-elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - 'ES_JAVA_OPTS=-Xms512m -Xmx512m'
+      - bootstrap.memory_lock=true
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    ports:
+      - '9200:9200'
+      - '9300:9300'
+    networks:
+      - gasolinera-logging
+    healthcheck:
+      test:
+        ['CMD-SHELL', 'curl -f http://localhost:9200/_cluster/health || exit 1']
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # Logstash para procesamiento de logs
+  logstash:
+    image: docker.elastic.co/logstash/logstash:8.11.0
+    container_name: gasolinera-logstash
+    volumes:
+      - ./logstash/pipeline:/usr/share/logstash/pipeline:ro
+      - ./logstash/config:/usr/share/logstash/config:ro
+    ports:
+      - '5000:5000'
+      - '5044:5044'
+    environment:
+      - 'LS_JAVA_OPTS=-Xmx256m -Xms256m'
+    networks:
+      - gasolinera-logging
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD-SHELL', 'curl -f http://localhost:9600/_node/stats || exit 1']
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # Kibana para visualización de logs
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.11.0
+    container_name: gasolinera-kibana
+    ports:
+      - '5601:5601'
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      - SERVER_NAME=gasolinera-kibana
+      - SERVER_HOST=0.0.0.0
+    networks:
+      - gasolinera-logging
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD-SHELL', 'curl -f http://localhost:5601/api/status || exit 1']
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # Filebeat para recolección de logs desde archivos
+  filebeat:
+    image: docker.elastic.co/beats/filebeat:8.11.0
+    container_name: gasolinera-filebeat
+    user: root
+    volumes:
+      - ./filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ../logs:/logs:ro
+    networks:
+      - gasolinera-logging
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    command: filebeat -e -strict.perms=false
+
+  # Fluentd como alternativa a Logstash (comentado por defecto)
+  # fluentd:
+  #   image: fluent/fluentd:v1.16-debian-1
+  #   container_name: gasolinera-fluentd
+  #   volumes:
+  #     - ./fluentd/conf:/fluentd/etc:ro
+  #     - ../logs:/logs:ro
+  #   ports:
+  #     - "24224:24224"
+  #     - "24224:24224/udp"
+  #   networks:
+  #     - gasolinera-logging
+  #   depends_on:
+  #     elasticsearch:
+  #       condition: service_healthy
+
+volumes:
+  elasticsearch_data:
+    driver: local
+
+networks:
+  gasolinera-logging:
+    driver: bridge
+    name: gasolinera-logging

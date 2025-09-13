@@ -1,0 +1,188 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: gasolinera-ssd
+  labels:
+    app: gasolinera-jsm
+    component: storage
+provisioner: kubernetes.io/aws-ebs  # Change based on your cloud provider
+parameters:
+  type: gp3
+  fsType: ext4
+  encrypted: "true"
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true
+reclaimPolicy: Retain
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: gasolinera-hdd
+  labels:
+    app: gasolinera-jsm
+    component: storage
+provisioner: kubernetes.io/aws-ebs  # Change based on your cloud provider
+parameters:
+  type: gp2
+  fsType: ext4
+  encrypted: "true"
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true
+reclaimPolicy: Retain
+---
+# PostgreSQL Primary PVC
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-primary-data
+  namespace: gasolinera-jsm
+  labels:
+    app: postgres
+    component: database
+    role: primary
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: gasolinera-ssd
+  resources:
+    requests:
+      storage: 100Gi
+---
+# PostgreSQL Replica PVC
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-replica-data
+  namespace: gasolinera-jsm
+  labels:
+    app: postgres
+    component: database
+    role: replica
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: gasolinera-ssd
+  resources:
+    requests:
+      storage: 100Gi
+---
+# Redis Primary PVC
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: redis-primary-data
+  namespace: gasolinera-jsm
+  labels:
+    app: redis
+    component: cache
+    role: primary
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: gasolinera-ssd
+  resources:
+    requests:
+      storage: 20Gi
+---
+# Redis Replica PVC
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: redis-replica-data
+  namespace: gasolinera-jsm
+  labels:
+    app: redis
+    component: cache
+    role: replica
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: gasolinera-ssd
+  resources:
+    requests:
+      storage: 20Gi
+---
+# RabbitMQ PVC
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: rabbitmq-data
+  namespace: gasolinera-jsm
+  labels:
+    app: rabbitmq
+    component: messaging
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: gasolinera-ssd
+  resources:
+    requests:
+      storage: 50Gi
+---
+# Vault PVC
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: vault-data
+  namespace: gasolinera-jsm
+  labels:
+    app: vault
+    component: secrets
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: gasolinera-ssd
+  resources:
+    requests:
+      storage: 10Gi
+---
+# Elasticsearch PVC
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: elasticsearch-data
+  namespace: gasolinera-jsm
+  labels:
+    app: elasticsearch
+    component: logging
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: gasolinera-ssd
+  resources:
+    requests:
+      storage: 200Gi
+---
+# Prometheus PVC
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: prometheus-data
+  namespace: gasolinera-jsm
+  labels:
+    app: prometheus
+    component: monitoring
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: gasolinera-ssd
+  resources:
+    requests:
+      storage: 100Gi
+---
+# Grafana PVC
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: grafana-data
+  namespace: gasolinera-jsm
+  labels:
+    app: grafana
+    component: monitoring
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: gasolinera-ssd
+  resources:
+    requests:
+      storage: 10Gi

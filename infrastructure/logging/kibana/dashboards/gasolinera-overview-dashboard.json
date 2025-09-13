@@ -1,0 +1,117 @@
+{
+  "version": "8.11.0",
+  "objects": [
+    {
+      "id": "gasolinera-overview",
+      "type": "dashboard",
+      "attributes": {
+        "title": "Gasolinera JSM - Overview Dashboard",
+        "description": "Dashboard principal para monitoreo de logs de Gasolinera JSM",
+        "panelsJSON": "[{\"version\":\"8.11.0\",\"gridData\":{\"x\":0,\"y\":0,\"w\":24,\"h\":15,\"i\":\"1\"},\"panelIndex\":\"1\",\"embeddableConfig\":{},\"panelRefName\":\"panel_1\"},{\"version\":\"8.11.0\",\"gridData\":{\"x\":24,\"y\":0,\"w\":24,\"h\":15,\"i\":\"2\"},\"panelIndex\":\"2\",\"embeddableConfig\":{},\"panelRefName\":\"panel_2\"},{\"version\":\"8.11.0\",\"gridData\":{\"x\":0,\"y\":15,\"w\":48,\"h\":15,\"i\":\"3\"},\"panelIndex\":\"3\",\"embeddableConfig\":{},\"panelRefName\":\"panel_3\"},{\"version\":\"8.11.0\",\"gridData\":{\"x\":0,\"y\":30,\"w\":24,\"h\":15,\"i\":\"4\"},\"panelIndex\":\"4\",\"embeddableConfig\":{},\"panelRefName\":\"panel_4\"},{\"version\":\"8.11.0\",\"gridData\":{\"x\":24,\"y\":30,\"w\":24,\"h\":15,\"i\":\"5\"},\"panelIndex\":\"5\",\"embeddableConfig\":{},\"panelRefName\":\"panel_5\"}]",
+        "timeRestore": false,
+        "timeTo": "now",
+        "timeFrom": "now-24h",
+        "refreshInterval": {
+          "pause": false,
+          "value": 30000
+        },
+        "kibanaSavedObjectMeta": {
+          "searchSourceJSON": "{\"query\":{\"match_all\":{}},\"filter\":[]}"
+        }
+      },
+      "references": [
+        {
+          "name": "panel_1",
+          "type": "visualization",
+          "id": "logs-by-service"
+        },
+        {
+          "name": "panel_2",
+          "type": "visualization",
+          "id": "error-rate-timeline"
+        },
+        {
+          "name": "panel_3",
+          "type": "visualization",
+          "id": "recent-logs-table"
+        },
+        {
+          "name": "panel_4",
+          "type": "visualization",
+          "id": "business-operations"
+        },
+        {
+          "name": "panel_5",
+          "type": "visualization",
+          "id": "performance-metrics"
+        }
+      ]
+    },
+    {
+      "id": "logs-by-service",
+      "type": "visualization",
+      "attributes": {
+        "title": "Logs por Servicio",
+        "visState": "{\"title\":\"Logs por Servicio\",\"type\":\"pie\",\"aggs\":[{\"id\":\"1\",\"type\":\"count\",\"schema\":\"metric\",\"params\":{}},{\"id\":\"2\",\"type\":\"terms\",\"schema\":\"segment\",\"params\":{\"field\":\"service.keyword\",\"size\":10,\"order\":\"desc\",\"orderBy\":\"1\"}}]}",
+        "uiStateJSON": "{}",
+        "description": "",
+        "kibanaSavedObjectMeta": {
+          "searchSourceJSON": "{\"index\":\"gasolinera-logs-*\",\"query\":{\"match_all\":{}},\"filter\":[]}"
+        }
+      }
+    },
+    {
+      "id": "error-rate-timeline",
+      "type": "visualization",
+      "attributes": {
+        "title": "Tasa de Errores en el Tiempo",
+        "visState": "{\"title\":\"Tasa de Errores en el Tiempo\",\"type\":\"line\",\"aggs\":[{\"id\":\"1\",\"type\":\"count\",\"schema\":\"metric\",\"params\":{}},{\"id\":\"2\",\"type\":\"date_histogram\",\"schema\":\"segment\",\"params\":{\"field\":\"@timestamp\",\"interval\":\"auto\",\"min_doc_count\":1}},{\"id\":\"3\",\"type\":\"filters\",\"schema\":\"group\",\"params\":{\"filters\":[{\"input\":{\"query\":{\"match\":{\"level\":\"ERROR\"}}},\"label\":\"Errores\"},{\"input\":{\"query\":{\"match\":{\"level\":\"WARN\"}}},\"label\":\"Warnings\"},{\"input\":{\"query\":{\"match\":{\"level\":\"INFO\"}}},\"label\":\"Info\"}]}}]}",
+        "uiStateJSON": "{}",
+        "description": "",
+        "kibanaSavedObjectMeta": {
+          "searchSourceJSON": "{\"index\":\"gasolinera-logs-*\",\"query\":{\"match_all\":{}},\"filter\":[]}"
+        }
+      }
+    },
+    {
+      "id": "recent-logs-table",
+      "type": "search",
+      "attributes": {
+        "title": "Logs Recientes",
+        "description": "Tabla de logs más recientes con información detallada",
+        "hits": 0,
+        "columns": ["@timestamp", "level", "service", "message", "mdc.correlationId", "mdc.userId"],
+        "sort": [["@timestamp", "desc"]],
+        "kibanaSavedObjectMeta": {
+          "searchSourceJSON": "{\"index\":\"gasolinera-logs-*\",\"highlightAll\":true,\"version\":true,\"query\":{\"match_all\":{}},\"filter\":[]}"
+        }
+      }
+    },
+    {
+      "id": "business-operations",
+      "type": "visualization",
+      "attributes": {
+        "title": "Operaciones de Negocio",
+        "visState": "{\"title\":\"Operaciones de Negocio\",\"type\":\"histogram\",\"aggs\":[{\"id\":\"1\",\"type\":\"count\",\"schema\":\"metric\",\"params\":{}},{\"id\":\"2\",\"type\":\"terms\",\"schema\":\"segment\",\"params\":{\"field\":\"business_operation.keyword\",\"size\":10,\"order\":\"desc\",\"orderBy\":\"1\"}}]}",
+        "uiStateJSON": "{}",
+        "description": "",
+        "kibanaSavedObjectMeta": {
+          "searchSourceJSON": "{\"index\":\"gasolinera-business-*\",\"query\":{\"match_all\":{}},\"filter\":[]}"
+        }
+      }
+    },
+    {
+      "id": "performance-metrics",
+      "type": "visualization",
+      "attributes": {
+        "title": "Métricas de Performance",
+        "visState": "{\"title\":\"Métricas de Performance\",\"type\":\"line\",\"aggs\":[{\"id\":\"1\",\"type\":\"avg\",\"schema\":\"metric\",\"params\":{\"field\":\"duration_ms\"}},{\"id\":\"2\",\"type\":\"date_histogram\",\"schema\":\"segment\",\"params\":{\"field\":\"@timestamp\",\"interval\":\"auto\",\"min_doc_count\":1}},{\"id\":\"3\",\"type\":\"terms\",\"schema\":\"group\",\"params\":{\"field\":\"context.operation.keyword\",\"size\":5,\"order\":\"desc\",\"orderBy\":\"1\"}}]}",
+        "uiStateJSON": "{}",
+        "description": "",
+        "kibanaSavedObjectMeta": {
+          "searchSourceJSON": "{\"index\":\"gasolinera-performance-*\",\"query\":{\"match_all\":{}},\"filter\":[]}"
+        }
+      }
+    }
+  ]
+}

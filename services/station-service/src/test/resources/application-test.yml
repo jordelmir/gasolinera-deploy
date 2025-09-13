@@ -1,0 +1,78 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: true
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+        format_sql: true
+    defer-datasource-initialization: true
+
+  h2:
+    console:
+      enabled: true
+
+  security:
+    enabled: false
+
+  flyway:
+    enabled: false
+
+# Vault configuration for tests
+vault:
+  enabled: false
+
+# JWT configuration for tests
+jwt:
+  secret: test-secret-key-for-jwt-signing-in-tests-environment-only
+  expiration: 3600
+  issuer: gasolinera-jsm-test
+  audience: gasolinera-jsm-test-users
+
+# Station service specific configuration for tests
+station:
+  default-pump-count: 4
+  max-pump-count: 50
+  default-capacity-per-hour: 60
+  default-service-time-minutes: 5
+
+# Logging configuration for tests
+logging:
+  level:
+    com.gasolinerajsm: DEBUG
+    org.springframework.security: DEBUG
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+  pattern:
+    console: '%d{yyyy-MM-dd HH:mm:ss} - %msg%n'
+
+# Actuator configuration for tests
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
+
+# Test-specific configurations
+test:
+  data:
+    cleanup: true
+
+  performance:
+    timeout: 5000ms
+
+# Geographic configuration for tests
+geo:
+  default-country: Mexico
+  default-radius-km: 50
+  max-search-radius-km: 500

@@ -6,8 +6,14 @@ import org.springframework.stereotype.Service
 @Service
 class UserService(private val userRepository: UserRepository) {
 
-    fun findOrCreateUser(phone: String): User {
-        return userRepository.findByPhone(phone) ?: userRepository.save(User(phone = phone))
+    fun findOrCreateUser(phone: String, firstName: String = "User", lastName: String = "Unknown"): User {
+        return userRepository.findByPhoneNumber(phone) ?: userRepository.save(
+            User(
+                phoneNumber = phone,
+                firstName = firstName,
+                lastName = lastName
+            )
+        )
     }
 
     fun findUserById(userId: Long): User? {

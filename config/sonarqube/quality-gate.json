@@ -1,0 +1,405 @@
+{
+  "name": "Gasolinera JSM World-Class Quality Gate",
+  "description": "Enterprise-grade quality gate with strict thresholds for world-class software development",
+  "isDefault": true,
+  "conditions": [
+    {
+      "metric": "new_coverage",
+      "operator": "LT",
+      "threshold": "85.0",
+      "errorThreshold": "80.0",
+      "description": "New code coverage must be at least 85% (error if below 80%)"
+    },
+    {
+      "metric": "coverage",
+      "operator": "LT",
+      "threshold": "80.0",
+      "errorThreshold": "75.0",
+      "description": "Overall coverage must be at least 80% (error if below 75%)"
+    },
+    {
+      "metric": "new_duplicated_lines_density",
+      "operator": "GT",
+      "threshold": "3.0",
+      "errorThreshold": "5.0",
+      "description": "New code duplication must be below 3% (error if above 5%)"
+    },
+    {
+      "metric": "duplicated_lines_density",
+      "operator": "GT",
+      "threshold": "5.0",
+      "errorThreshold": "10.0",
+      "description": "Overall duplication must be below 5% (error if above 10%)"
+    },
+    {
+      "metric": "new_maintainability_rating",
+      "operator": "GT",
+      "threshold": "1",
+      "errorThreshold": "2",
+      "description": "New code maintainability rating must be A (error if worse than B)"
+    },
+    {
+      "metric": "maintainability_rating",
+      "operator": "GT",
+      "threshold": "2",
+      "errorThreshold": "3",
+      "description": "Overall maintainability rating must be B or better (error if worse than C)"
+    },
+    {
+      "metric": "new_reliability_rating",
+      "operator": "GT",
+      "threshold": "1",
+      "errorThreshold": "1",
+      "description": "New code reliability rating must be A (no bugs allowed)"
+    },
+    {
+      "metric": "reliability_rating",
+      "operator": "GT",
+      "threshold": "1",
+      "errorThreshold": "2",
+      "description": "Overall reliability rating must be A (error if worse than B)"
+    },
+    {
+      "metric": "new_security_rating",
+      "operator": "GT",
+      "threshold": "1",
+      "errorThreshold": "1",
+      "description": "New code security rating must be A (no vulnerabilities allowed)"
+    },
+    {
+      "metric": "security_rating",
+      "operator": "GT",
+      "threshold": "1",
+      "errorThreshold": "2",
+      "description": "Overall security rating must be A (error if worse than B)"
+    },
+    {
+      "metric": "new_security_hotspots_reviewed",
+      "operator": "LT",
+      "threshold": "100.0",
+      "errorThreshold": "90.0",
+      "description": "All new security hotspots must be reviewed (error if below 90%)"
+    },
+    {
+      "metric": "security_hotspots_reviewed",
+      "operator": "LT",
+      "threshold": "95.0",
+      "errorThreshold": "85.0",
+      "description": "At least 95% of security hotspots must be reviewed (error if below 85%)"
+    },
+    {
+      "metric": "new_blocker_violations",
+      "operator": "GT",
+      "threshold": "0",
+      "errorThreshold": "0",
+      "description": "No new blocker violations allowed"
+    },
+    {
+      "metric": "blocker_violations",
+      "operator": "GT",
+      "threshold": "0",
+      "errorThreshold": "1",
+      "description": "No blocker violations allowed (error if more than 1)"
+    },
+    {
+      "metric": "new_critical_violations",
+      "operator": "GT",
+      "threshold": "0",
+      "errorThreshold": "1",
+      "description": "No new critical violations allowed (error if more than 1)"
+    },
+    {
+      "metric": "critical_violations",
+      "operator": "GT",
+      "threshold": "5",
+      "errorThreshold": "10",
+      "description": "Maximum 5 critical violations allowed (error if more than 10)"
+    },
+    {
+      "metric": "new_major_violations",
+      "operator": "GT",
+      "threshold": "5",
+      "errorThreshold": "10",
+      "description": "Maximum 5 new major violations allowed (error if more than 10)"
+    },
+    {
+      "metric": "new_minor_violations",
+      "operator": "GT",
+      "threshold": "20",
+      "errorThreshold": "50",
+      "description": "Maximum 20 new minor violations allowed (error if more than 50)"
+    },
+    {
+      "metric": "new_code_smells",
+      "operator": "GT",
+      "threshold": "10",
+      "errorThreshold": "25",
+      "description": "Maximum 10 new code smells allowed (error if more than 25)"
+    },
+    {
+      "metric": "new_bugs",
+      "operator": "GT",
+      "threshold": "0",
+      "errorThreshold": "1",
+      "description": "No new bugs allowed (error if more than 1)"
+    },
+    {
+      "metric": "bugs",
+      "operator": "GT",
+      "threshold": "5",
+      "errorThreshold": "15",
+      "description": "Maximum 5 bugs allowed (error if more than 15)"
+    },
+    {
+      "metric": "new_vulnerabilities",
+      "operator": "GT",
+      "threshold": "0",
+      "errorThreshold": "0",
+      "description": "No new vulnerabilities allowed"
+    },
+    {
+      "metric": "vulnerabilities",
+      "operator": "GT",
+      "threshold": "0",
+      "errorThreshold": "3",
+      "description": "No vulnerabilities allowed (error if more than 3)"
+    },
+    {
+      "metric": "new_technical_debt",
+      "operator": "GT",
+      "threshold": "30min",
+      "errorThreshold": "2h",
+      "description": "New technical debt must be below 30 minutes (error if above 2 hours)"
+    },
+    {
+      "metric": "sqale_debt_ratio",
+      "operator": "GT",
+      "threshold": "5.0",
+      "errorThreshold": "10.0",
+      "description": "Technical debt ratio must be below 5% (error if above 10%)"
+    },
+    {
+      "metric": "new_sqale_debt_ratio",
+      "operator": "GT",
+      "threshold": "3.0",
+      "errorThreshold": "5.0",
+      "description": "New technical debt ratio must be below 3% (error if above 5%)"
+    },
+    {
+      "metric": "cognitive_complexity",
+      "operator": "GT",
+      "threshold": "15",
+      "errorThreshold": "25",
+      "description": "Cognitive complexity per function must be below 15 (error if above 25)"
+    },
+    {
+      "metric": "complexity",
+      "operator": "GT",
+      "threshold": "10",
+      "errorThreshold": "20",
+      "description": "Cyclomatic complexity per function must be below 10 (error if above 20)"
+    },
+    {
+      "metric": "file_complexity",
+      "operator": "GT",
+      "threshold": "200",
+      "errorThreshold": "400",
+      "description": "File complexity must be below 200 (error if above 400)"
+    },
+    {
+      "metric": "class_complexity",
+      "operator": "GT",
+      "threshold": "80",
+      "errorThreshold": "150",
+      "description": "Class complexity must be below 80 (error if above 150)"
+    },
+    {
+      "metric": "function_complexity",
+      "operator": "GT",
+      "threshold": "15",
+      "errorThreshold": "25",
+      "description": "Function complexity must be below 15 (error if above 25)"
+    }
+  ],
+  "qualityGateSettings": {
+    "failOnWarning": false,
+    "failOnError": true,
+    "ignoreWarningsOnNewCode": false,
+    "sonarWayRecommended": true
+  },
+  "notifications": {
+    "onQualityGateFailure": {
+      "enabled": true,
+      "channels": ["slack", "email"],
+      "recipients": [
+        "tech-lead@gasolinera-jsm.com",
+        "dev-team@gasolinera-jsm.com"
+      ]
+    },
+    "onQualityGateSuccess": {
+      "enabled": false,
+      "channels": ["slack"]
+    }
+  },
+  "integrations": {
+    "github": {
+      "enabled": true,
+      "blockPullRequestOnFailure": true,
+      "addCommentsOnPullRequest": true,
+      "reportCoverageOnPullRequest": true
+    },
+    "jira": {
+      "enabled": true,
+      "createIssueOnFailure": true,
+      "projectKey": "GSOL",
+      "issueType": "Bug"
+    }
+  },
+  "customRules": [
+    {
+      "name": "Hexagonal Architecture Compliance",
+      "description": "Ensure domain layer doesn't depend on infrastructure",
+      "severity": "BLOCKER",
+      "pattern": "Domain classes must not import infrastructure packages",
+      "regex": "^com\\.gasolinerajsm\\.[^.]+\\.domain\\.[^.]+$"
+    },
+    {
+      "name": "Use Case Naming Convention",
+      "description": "Use cases must follow naming convention",
+      "severity": "MAJOR",
+      "pattern": "Use case classes must end with 'UseCase'",
+      "regex": ".*UseCase$"
+    },
+    {
+      "name": "Repository Interface Location",
+      "description": "Repository interfaces must be in domain.ports package",
+      "severity": "MAJOR",
+      "pattern": "Repository interfaces must be in correct package",
+      "regex": "^com\\.gasolinerajsm\\.[^.]+\\.domain\\.ports\\..*Repository$"
+    },
+    {
+      "name": "Entity Immutability",
+      "description": "Domain entities should be immutable (data classes)",
+      "severity": "MAJOR",
+      "pattern": "Domain entities should use data classes",
+      "regex": "^data class.*$"
+    },
+    {
+      "name": "Test Coverage for Use Cases",
+      "description": "All use cases must have corresponding tests",
+      "severity": "CRITICAL",
+      "pattern": "Use cases must have test coverage",
+      "testPattern": ".*UseCaseTest$"
+    }
+  ],
+  "exclusions": {
+    "coverage": [
+      "**/config/**",
+      "**/dto/**",
+      "**/entity/**",
+      "**/*Application.kt",
+      "**/*Config.kt",
+      "**/*Configuration.kt"
+    ],
+    "duplications": ["**/dto/**", "**/entity/**", "**/generated/**"],
+    "issues": ["**/test/**", "**/build/**", "**/generated/**"]
+  },
+  "languageSpecific": {
+    "kotlin": {
+      "rules": {
+        "detekt": {
+          "enabled": true,
+          "configFile": "config/detekt/detekt.yml",
+          "reportFormat": "xml"
+        },
+        "ktlint": {
+          "enabled": true,
+          "android": false,
+          "experimental": true
+        }
+      },
+      "metrics": {
+        "complexity": {
+          "threshold": 15,
+          "excludeAccessors": true
+        },
+        "cognitiveComplexity": {
+          "threshold": 15
+        }
+      }
+    },
+    "java": {
+      "rules": {
+        "checkstyle": {
+          "enabled": true,
+          "configFile": "config/checkstyle/checkstyle.xml"
+        },
+        "pmd": {
+          "enabled": true,
+          "rulesets": ["category/java/bestpractices.xml"]
+        },
+        "spotbugs": {
+          "enabled": true,
+          "effort": "max",
+          "threshold": "low"
+        }
+      }
+    }
+  },
+  "reportFormats": {
+    "html": {
+      "enabled": true,
+      "includeSourceCode": true
+    },
+    "xml": {
+      "enabled": true
+    },
+    "json": {
+      "enabled": true
+    },
+    "sarif": {
+      "enabled": true,
+      "uploadToGitHub": true
+    }
+  },
+  "scheduling": {
+    "dailyAnalysis": {
+      "enabled": true,
+      "time": "02:00",
+      "timezone": "UTC",
+      "branches": ["main", "develop"]
+    },
+    "weeklyDeepAnalysis": {
+      "enabled": true,
+      "day": "sunday",
+      "time": "03:00",
+      "includeHistoricalData": true
+    }
+  },
+  "thresholds": {
+    "worldClass": {
+      "coverage": 90,
+      "duplication": 2,
+      "maintainability": "A",
+      "reliability": "A",
+      "security": "A",
+      "technicalDebt": "< 1%"
+    },
+    "enterprise": {
+      "coverage": 85,
+      "duplication": 3,
+      "maintainability": "A",
+      "reliability": "A",
+      "security": "A",
+      "technicalDebt": "< 3%"
+    },
+    "production": {
+      "coverage": 80,
+      "duplication": 5,
+      "maintainability": "B",
+      "reliability": "A",
+      "security": "A",
+      "technicalDebt": "< 5%"
+    }
+  }
+}

@@ -1,127 +1,351 @@
 package com.gasolinerajsm.raffleservice.service
 
-import com.gasolinerajsm.raffleservice.model.Raffle
-import com.gasolinerajsm.raffleservice.model.RaffleEntry
-import com.gasolinerajsm.raffleservice.model.RaffleStatus
-import com.gasolinerajsm.raffleservice.model.RaffleWinner
-import com.gasolinerajsm.raffleservice.repository.RaffleEntryRepository
-import com.gasolinerajsm.raffleservice.repository.RaffleRepository
-import com.gasolinerajsm.raffleservice.repository.RaffleWinnerRepository
-import com.gasolinerajsm.raffleservice.util.MerkleTreeGenerator
+import com.gasolinerajsm.raffleservice.model.*
+import com.gasolinerajsm.raffleservice.repository.*
 import org.slf4j.LoggerFactory
+import org.springframework.data.domain.Page
+import org.springframework.data.domain.Pageable
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
-import org.springframework.web.reactive.function.client.WebClient
-import reactor.core.publisher.Mono
-import java.math.BigInteger
 import java.time.LocalDateTime
+import kotlin.random.Random
 
+/**
+ * Service for managing raffles, draws, and winner selection
+ */
 @Service
+@Transactional
 class RaffleService(
     private val raffleRepository: RaffleRepository,
-    private val raffleEntryRepository: RaffleEntryRepository,
+    private val raffleTicketRepository: RaffleTicketRepository,
+    private val rafflePrizeRepository: RafflePrizeRepository,
     private val raffleWinnerRepository: RaffleWinnerRepository,
-    private val webClientBuilder: WebClient.Builder
+    private val prizeDistributionService: PrizeDistributionService
 ) {
-
     private val logger = LoggerFactory.getLogger(RaffleService::class.java)
 
-    @Transactional
-    fun closeRafflePeriod(period: String): Raffle {
-        logger.info("Attempting to close raffle period: {}", period)
+    /**
+     * Create a new raffle
+     */
+    fun createRaffle(raffle: Raffle): Raffle {
+        logger.info("Creating new raffle: ${raffle.name}")
 
-        val existingRaffle = raffleRepository.findByPeriod(period)
-        if (existingRaffle != null && existingRaffle.status != RaffleStatus.OPEN) {
-            throw IllegalStateException("Raffle for period $period is already closed or drawn.")
+        // Validate raffle data
+        validateRaffleData(raffle)
+
+        // Check for name conflicts
+        if (raffleRepository.existsByNameIgnoreCase(raffle.name)) {
+            throw IllegalArgumentException("Raffle with name '${raffle.name}' already exists")
         }
 
-        // TODO: Fetch actual point IDs from redemption-service for the given period
-        // For now, simulate fetching point IDs
-        val pointIds = (1..100).map { "point_id_${it}_$period" }
-        if (pointIds.isEmpty()) {
-            throw IllegalStateException("No points found for period $period. Cannot close raffle.")
-        }
-        logger.info("Fetched {} point IDs for period {}", pointIds.size, period)
-
-        val merkleRoot = MerkleTreeGenerator.generateMerkleRoot(pointIds)
-        logger.info("Generated Merkle Root for period {}: {}", period, merkleRoot)
-
-        val raffle = existingRaffle ?: Raffle(period = period, merkleRoot = merkleRoot)
-        raffle.merkleRoot = merkleRoot // Update if already exists
-        raffle.status = RaffleStatus.CLOSED
         val savedRaffle = raffleRepository.save(raffle)
-        logger.info("Raffle for period {} closed with ID: {}", period, savedRaffle.id)
-
-        // Save raffle entries
-        pointIds.forEach { pointId ->
-            raffleEntryRepository.save(RaffleEntry(raffleId = savedRaffle.id!!, pointId = pointId))
-        }
-        logger.info("Saved {} raffle entries for raffle ID: {}", pointIds.size, savedRaffle.id)
+        logger.info("Created raffle with ID: ${savedRaffle.id}")
 
         return savedRaffle
     }
 
-    @Transactional
-    fun executeRaffleDraw(raffleId: Long): RaffleWinner {
-        logger.info("Attempting to execute draw for raffle ID: {}", raffleId)
-        val raffle = raffleRepository.findById(raffleId)
-            .orElseThrow { IllegalArgumentException("Raffle with ID $raffleId not found.") }
+    /**
+     * Update an existing raffle
+     */
+    fun updateRaffle(id: Long, updatedRaffle: Raffle): Raffle {
+        logger.info("Updating raffle with ID: $id")
 
-        if (raffle.status != RaffleStatus.CLOSED) {
-            throw IllegalStateException("Raffle with ID $raffleId is not in CLOSED status. Current status: ${raffle.status}")
+        val existingRaffle = getRaffleById(id)
+
+        // Check if raffle can be modified
+        if (!existingRaffle.status.allowsModifications()) {
+            throw IllegalStateException("Raffle in status '${existingRaffle.status}' cannot be modified")
         }
 
-        val externalSeed = getBitcoinBlockhash().block() // Blocking call for simplicity in demo
-        if (externalSeed == null) {
-            throw IllegalStateException("Could not retrieve external seed for draw.")
-        }
-        logger.info("Retrieved external seed for raffle ID {}: {}", raffleId, externalSeed)
+        // Validate updated data
+        validateRaffleData(updatedRaffle)
 
-        val entries = raffleEntryRepository.findByRaffleId(raffleId)
-        if (entries.isEmpty()) {
-            throw IllegalStateException("No entries found for raffle ID $raffleId. Cannot draw winner.")
+        // Check for name conflicts (excluding current raffle)
+        if (updatedRaffle.name != existingRaffle.name &&
+            raffleRepository.existsByNameIgnoreCase(updatedRaffle.name)) {
+            throw IllegalArgumentException("Raffle with name '${updatedRaffle.name}' already exists")
         }
 
-        val winnerIndex = selectWinnerDeterministically(raffle.merkleRoot, externalSeed, entries.size)
-        val winningEntry = entries[winnerIndex]
-        logger.info("Selected winning entry for raffle ID {}: Index {}, Point ID {}", raffleId, winnerIndex, winningEntry.pointId)
-
-        val winner = RaffleWinner(
-            raffleId = raffle.id!!,
-            userId = "mock-user-id-from-point", // TODO: Extract user ID from pointId or fetch from redemption-service
-            winningPointId = winningEntry.pointId,
-            prize = "10000 Puntos G" // Example prize
+        val raffle = updatedRaffle.copy(
+            id = id,
+            createdAt = existingRaffle.createdAt,
+            updatedAt = LocalDateTime.now()
         )
-        val savedWinner = raffleWinnerRepository.save(winner)
 
-        raffle.status = RaffleStatus.DRAWN
-        raffle.drawAt = LocalDateTime.now()
-        raffle.externalSeed = externalSeed
-        raffle.winnerEntryId = winningEntry.pointId
-        raffleRepository.save(raffle)
-        logger.info("Raffle ID {} drawn. Winner: {}", raffleId, savedWinner.winningPointId)
-
-        return savedWinner
+        return raffleRepository.save(raffle)
     }
 
-    private fun getBitcoinBlockhash(): Mono<String> {
-        // Using a public API for Bitcoin block hash
-        val webClient = webClientBuilder.baseUrl("https://blockchain.info").build()
-        return webClient.get()
-            .uri("/q/latesthash")
-            .retrieve()
-            .bodyToMono(String::class.java)
-            .doOnError { e -> logger.error("Error fetching Bitcoin block hash: {}", e.message) }
+    /**
+     * Get raffle by ID
+     */
+    @Transactional(readOnly = true)
+    fun getRaffleById(id: Long): Raffle {
+        return raffleRepository.findById(id)
+            .orElseThrow { NoSuchElementException("Raffle not found with ID: $id") }
     }
 
-    private fun selectWinnerDeterministically(merkleRoot: String, seed: String, numberOfEntries: Int): Int {
-        // Combine Merkle Root and external seed
-        val combinedHash = MerkleTreeGenerator.sha256(merkleRoot + seed)
-        
-        // Convert hash to a large integer
-        val bigInt = BigInteger(combinedHash, 16)
+    /**
+     * Get all raffles with pagination
+     */
+    @Transactional(readOnly = true)
+    fun getAllRaffles(pageable: Pageable): Page<Raffle> {
+        return raffleRepository.findAll(pageable)
+    }
 
-        // Use modulo to get a deterministic index
-        return bigInt.mod(BigInteger.valueOf(numberOfEntries.toLong())).toInt()
+    /**
+     * Get raffles by status
+     */
+    @Transactional(readOnly = true)
+    fun getRafflesByStatus(status: RaffleStatus, pageable: Pageable): Page<Raffle> {
+        return raffleRepository.findByStatus(status, pageable)
+    }
+
+    /**
+     * Get active public raffles
+     */
+    @Transactional(readOnly = true)
+    fun getActivePublicRaffles(pageable: Pageable): Page<Raffle> {
+        return raffleRepository.findByStatusAndIsPublicTrue(RaffleStatus.ACTIVE, pageable)
+    }
+
+    /**
+     * Get raffles with open registration
+     */
+    @Transactional(readOnly = true)
+    fun getRafflesWithOpenRegistration(pageable: Pageable): Page<Raffle> {
+        return raffleRepository.findRafflesWithOpenRegistration(
+            status = RaffleStatus.ACTIVE,
+            isPublic = true,
+            pageable = pageable
+        )
+    }
+
+    /**
+     * Activate a raffle
+     */
+    fun activateRaffle(id: Long, activatedBy: String? = null): Raffle {
+        logger.info("Activating raffle with ID: $id")
+
+        val raffle = getRaffleById(id)
+
+        if (raffle.status != RaffleStatus.DRAFT) {
+            throw IllegalStateException("Only draft raffles can be activated")
+        }
+
+        // Validate raffle has prizes
+        val prizes = rafflePrizeRepository.findByRaffleIdAndStatus(id, PrizeStatus.ACTIVE)
+        if (prizes.isEmpty()) {
+            throw IllegalStateException("Raffle must have at least one active prize to be activated")
+        }
+
+        val activatedRaffle = raffle.activate(activatedBy)
+        return raffleRepository.save(activatedRaffle)
+    }
+
+    /**
+     * Pause a raffle
+     */
+    fun pauseRaffle(id: Long, pausedBy: String? = null): Raffle {
+        logger.info("Pausing raffle with ID: $id")
+
+        val raffle = getRaffleById(id)
+
+        if (raffle.status != RaffleStatus.ACTIVE) {
+            throw IllegalStateException("Only active raffles can be paused")
+        }
+
+        val pausedRaffle = raffle.pause(pausedBy)
+        return raffleRepository.save(pausedRaffle)
+    }
+
+    /**
+     * Cancel a raffle
+     */
+    fun cancelRaffle(id: Long, cancelledBy: String? = null): Raffle {
+        logger.info("Cancelling raffle with ID: $id")
+
+        val raffle = getRaffleById(id)
+
+        if (raffle.status.isFinalState()) {
+            throw IllegalStateException("Raffle in final state cannot be cancelled")
+        }
+
+        val cancelledRaffle = raffle.cancel(cancelledBy)
+        return raffleRepository.save(cancelledRaffle)
+    }
+
+    /**
+     * Execute raffle draw
+     */
+    fun executeRaffleDraw(raffleId: Long, executedBy: String? = null): List<RaffleWinner> {
+        logger.info("Executing draw for raffle ID: $raffleId")
+
+        val raffle = getRaffleById(raffleId)
+
+        // Validate raffle is eligible for draw
+        if (!raffle.isEligibleForDraw()) {
+            throw IllegalStateException("Raffle is not eligible for draw")
+        }
+
+        // Get eligible tickets
+        val eligibleTickets = raffleTicketRepository.findEligibleTicketsForDraw(raffleId)
+        if (eligibleTickets.isEmpty()) {
+            throw IllegalStateException("No eligible tickets found for draw")
+        }
+
+        logger.info("Found ${eligibleTickets.size} eligible tickets for draw")
+
+        // Get available prizes
+        val availablePrizes = rafflePrizeRepository.findAvailablePrizesByRaffle(raffleId)
+        if (availablePrizes.isEmpty()) {
+            throw IllegalStateException("No available prizes found for draw")
+        }
+
+        logger.info("Found ${availablePrizes.size} available prizes for draw")
+
+        // Execute prize distribution
+        val winners = prizeDistributionService.distributePrizes(raffle, eligibleTickets, availablePrizes)
+
+        // Save winners
+        val savedWinners = raffleWinnerRepository.saveAll(winners)
+
+        // Mark winning tickets
+        winners.forEach { winner ->
+            raffleTicketRepository.markAsWinner(winner.ticket.id)
+        }
+
+        // Update prize awarded quantities
+        winners.groupBy { it.prize.id }.forEach { (prizeId, prizeWinners) ->
+            rafflePrizeRepository.findById(prizeId).ifPresent { prize ->
+                val updatedPrize = prize.copy(quantityAwarded = prize.quantityAwarded + prizeWinners.size)
+                rafflePrizeRepository.save(updatedPrize)
+            }
+        }
+
+        // Complete the raffle
+        val completedRaffle = raffle.complete(executedBy)
+        raffleRepository.save(completedRaffle)
+
+        logger.info("Draw completed for raffle ID: $raffleId, ${savedWinners.size} winners selected")
+
+        return savedWinners
+    }
+
+    /**
+     * Get raffle statistics
+     */
+    @Transactional(readOnly = true)
+    fun getRaffleStatistics(raffleId: Long): Map<String, Any> {
+        val raffle = getRaffleById(raffleId)
+        val ticketStats = raffleTicketRepository.getRaffleTicketStatistics(raffleId)
+        val prizeStats = rafflePrizeRepository.getPrizeStatisticsByRaffle(raffleId)
+        val winnerStats = raffleWinnerRepository.getWinnerStatisticsByRaffle(raffleId)
+
+        return mapOf(
+            "raffle" to mapOf(
+                "id" to raffle.id,
+                "name" to raffle.name,
+                "status" to raffle.status,
+                "type" to raffle.raffleType,
+                "currentParticipants" to raffle.currentParticipants,
+                "maxParticipants" to raffle.maxParticipants,
+                "registrationStart" to raffle.registrationStart,
+                "registrationEnd" to raffle.registrationEnd,
+                "drawDate" to raffle.drawDate,
+                "isRegistrationOpen" to raffle.isRegistrationOpen(),
+                "participationRate" to raffle.getParticipationRate()
+            ),
+            "tickets" to ticketStats,
+            "prizes" to prizeStats,
+            "winners" to winnerStats
+        )
+    }
+
+    /**
+     * Search raffles by name
+     */
+    @Transactional(readOnly = true)
+    fun searchRafflesByName(name: String, pageable: Pageable): Page<Raffle> {
+        return raffleRepository.findByNameContainingIgnoreCase(name, pageable)
+    }
+
+    /**
+     * Get raffles ready for draw
+     */
+    @Transactional(readOnly = true)
+    fun getRafflesReadyForDraw(): List<Raffle> {
+        return raffleRepository.findRafflesReadyForDraw()
+    }
+
+    /**
+     * Get raffles expiring soon
+     */
+    @Transactional(readOnly = true)
+    fun getRafflesExpiringSoon(hours: Long = 24): List<Raffle> {
+        val deadline = LocalDateTime.now().plusHours(hours)
+        return raffleRepository.findRafflesExpiringSoon(deadline = deadline)
+    }
+
+    /**
+     * Update participant count for raffle
+     */
+    fun updateParticipantCount(raffleId: Long): Raffle {
+        val raffle = getRaffleById(raffleId)
+        val participantCount = raffleTicketRepository.countByRaffleIdAndStatus(raffleId, TicketStatus.ACTIVE)
+
+        val updatedRaffle = raffle.updateParticipantCount(participantCount.toInt())
+        return raffleRepository.save(updatedRaffle)
+    }
+
+    /**
+     * Delete raffle (only if in draft status and no tickets)
+     */
+    fun deleteRaffle(id: Long) {
+        logger.info("Deleting raffle with ID: $id")
+
+        val raffle = getRaffleById(id)
+
+        if (raffle.status != RaffleStatus.DRAFT) {
+            throw IllegalStateException("Only draft raffles can be deleted")
+        }
+
+        val ticketCount = raffleTicketRepository.countByRaffleId(id)
+        if (ticketCount > 0) {
+            throw IllegalStateException("Cannot delete raffle with existing tickets")
+        }
+
+        raffleRepository.deleteById(id)
+        logger.info("Deleted raffle with ID: $id")
+    }
+
+    /**
+     * Validate raffle data
+     */
+    private fun validateRaffleData(raffle: Raffle) {
+        // Validate dates
+        if (raffle.registrationStart.isAfter(raffle.registrationEnd)) {
+            throw IllegalArgumentException("Registration start date must be before end date")
+        }
+
+        if (raffle.registrationEnd.isAfter(raffle.drawDate)) {
+            throw IllegalArgumentException("Registration end date must be before draw date")
+        }
+
+        // Validate participant limits
+        if (raffle.maxParticipants != null && raffle.maxParticipants <= 0) {
+            throw IllegalArgumentException("Max participants must be positive")
+        }
+
+        if (raffle.minTicketsToParticipate <= 0) {
+            throw IllegalArgumentException("Minimum tickets to participate must be positive")
+        }
+
+        if (raffle.maxTicketsPerUser != null && raffle.maxTicketsPerUser <= 0) {
+            throw IllegalArgumentException("Max tickets per user must be positive")
+        }
+
+        if (raffle.maxTicketsPerUser != null && raffle.maxTicketsPerUser < raffle.minTicketsToParticipate) {
+            throw IllegalArgumentException("Max tickets per user cannot be less than minimum tickets to participate")
+        }
     }
 }

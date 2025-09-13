@@ -1,0 +1,184 @@
+gasolinera:
+  database:
+    optimization:
+      enabled: true
+      application-name: ${spring.application.name:gasolinera-jsm}
+
+      # Connection URL with optimizations
+      url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/gasolinera_jsm?applicationName=${gasolinera.database.optimization.application-name}&tcpKeepAlive=true&socketTimeout=30&loginTimeout=10&connectTimeout=10}
+      username: ${DATABASE_USERNAME:gasolinera_user}
+      password: ${DATABASE_PASSWORD:gasolinera_pass}
+
+      # HikariCP Optimizations
+      hikari:
+        maximum-pool-size: ${DATABASE_MAX_POOL_SIZE:20}
+        minimum-idle: ${DATABASE_MIN_IDLE:5}
+        connection-timeout: ${DATABASE_CONNECTION_TIMEOUT:30000}
+        idle-timeout: ${DATABASE_IDLE_TIMEOUT:600000}
+        max-lifetime: ${DATABASE_MAX_LIFETIME:1800000}
+        leak-detection-threshold: ${DATABASE_LEAK_DETECTION:60000}
+        validation-timeout: ${DATABASE_VALIDATION_TIMEOUT:5000}
+        initialization-fail-timeout: ${DATABASE_INIT_FAIL_TIMEOUT:1}
+
+      # Query Optimization Settings
+      query-optimization:
+        enabled: true
+        slow-query-threshold: 1000ms
+        explain-analyze-threshold: 5000ms
+        log-slow-queries: true
+        cache-prepared-statements: true
+        prepared-statement-cache-size: 250
+        prepared-statement-cache-sql-limit: 2048
+
+      # Index Management
+      index-optimization:
+        enabled: true
+        auto-analyze-threshold: 0.1
+        auto-vacuum-threshold: 0.2
+        monitor-unused-indexes: true
+        suggest-missing-indexes: true
+
+      # Partitioning Settings
+      partitioning:
+        enabled: true
+        auto-create-partitions: true
+        partition-retention-months: 24
+        maintenance-schedule: "0 2 1 * *" # First day of month at 2 AM
+
+      # Connection Pool Monitoring
+      monitoring:
+        enabled: true
+        log-connection-stats: true
+        connection-stats-interval: 300s
+        alert-on-pool-exhaustion: true
+        alert-on-slow-queries: true
+
+      # Read Replica Configuration
+      read-replica:
+        enabled: ${DATABASE_READ_REPLICA_ENABLED:false}
+        replicas:
+          - name: "replica-1"
+            url: ${DATABASE_READ_REPLICA_1_URL:}
+            username: ${DATABASE_READ_REPLICA_1_USERNAME:}
+            password: ${DATABASE_READ_REPLICA_1_PASSWORD:}
+            max-pool-size: 15
+            min-idle: 3
+            weight: 1
+            enabled: true
+          - name: "replica-2"
+            url: ${DATABASE_READ_REPLICA_2_URL:}
+            username: ${DATABASE_READ_REPLICA_2_USERNAME:}
+            password: ${DATABASE_READ_REPLICA_2_PASSWORD:}
+            max-pool-size: 15
+            min-idle: 3
+            weight: 1
+            enabled: ${DATABASE_READ_REPLICA_2_ENABLED:false}
+        load-balancing-strategy: ROUND_ROBIN
+        health-check-interval: PT30S
+        failover-enabled: true
+        max-retries: 3
+
+      # Primary DataSource Configuration
+      primary:
+        url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/gasolinera_jsm}
+        username: ${DATABASE_USERNAME:gasolinera_user}
+        password: ${DATABASE_PASSWORD:gasolinera_pass}
+        max-pool-size: 20
+        min-idle: 5
+        connection-timeout: PT30S
+        idle-timeout: PT10M
+        max-lifetime: PT30M
+        leak-detection-threshold: PT1M
+
+      # Performance Monitoring
+      performance-monitoring: ${DATABASE_PERFORMANCE_MONITORING:true}
+      n-plus-one-detection: ${DATABASE_NPLUS1_DETECTION:true}
+      query-optimization: ${DATABASE_QUERY_OPTIMIZATION:true}
+
+      # Maintenance Settings
+      maintenance:
+        auto-vacuum-enabled: true
+        auto-analyze-enabled: true
+        statistics-update-frequency: DAILY
+        index-maintenance-enabled: true
+        partition-maintenance-enabled: true
+
+# Spring Data JPA Optimizations
+spring:
+  jpa:
+    properties:
+      hibernate:
+        # Query Optimizations
+        jdbc:
+          batch_size: 50
+          batch_versioned_data: true
+          order_inserts: true
+          order_updates: true
+
+        # Cache Settings
+        cache:
+          use_second_level_cache: true
+          use_query_cache: true
+          region:
+            factory_class: org.hibernate.cache.jcache.JCacheRegionFactory
+
+        # Connection Settings
+        connection:
+          provider_disables_autocommit: true
+          autocommit: false
+
+        # Performance Settings
+        generate_statistics: ${HIBERNATE_GENERATE_STATS:false}
+        format_sql: ${HIBERNATE_FORMAT_SQL:false}
+        show_sql: ${HIBERNATE_SHOW_SQL:false}
+        use_sql_comments: ${HIBERNATE_SQL_COMMENTS:false}
+
+        # Dialect and Schema
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        default_schema: public
+
+        # Lazy Loading Optimizations
+        enable_lazy_load_no_trans: false
+        max_fetch_depth: 3
+        default_batch_fetch_size: 16
+
+    # JPA Settings
+    open-in-view: false
+    show-sql: false
+    hibernate:
+      ddl-auto: validate
+      naming:
+        physical-strategy: org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
+        implicit-strategy: org.hibernate.boot.model.naming.ImplicitNamingStrategyLegacyJpaImpl
+
+# Connection Pool Metrics
+management:
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+    distribution:
+      percentiles-histogram:
+        hikaricp.connections: true
+        hibernate.query: true
+    tags:
+      application: ${spring.application.name}
+      database: postgresql
+
+# Logging Configuration for Database
+logging:
+  level:
+    com.zaxxer.hikari: ${HIKARI_LOG_LEVEL:INFO}
+    org.hibernate.SQL: ${HIBERNATE_SQL_LOG_LEVEL:WARN}
+    org.hibernate.type.descriptor.sql.BasicBinder: ${HIBERNATE_BIND_LOG_LEVEL:WARN}
+    org.hibernate.stat: ${HIBERNATE_STATS_LOG_LEVEL:WARN}
+    com.gasolinerajsm.shared.database: ${DATABASE_OPTIMIZATION_LOG_LEVEL:INFO}
+
+# Database Health Checks
+management:
+  health:
+    db:
+      enabled: true
+    diskspace:
+      enabled: true
+      threshold: 10GB

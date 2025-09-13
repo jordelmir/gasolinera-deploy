@@ -39,12 +39,19 @@ repositories {
 
 dependencies {
     detektPlugins("io.gitlab.arturbosch.detekt:detekt-formatting:1.23.7") // Detekt formatting rules
+
+    // --- Shared Modules ---
+    implementation(project(":shared:messaging"))
+    implementation(project(":shared:common"))
+    implementation(project(":shared:security"))
+
     // --- Spring Boot Starters ---
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
     implementation("org.springframework.boot:spring-boot-starter-data-redis")
     implementation("org.springframework.boot:spring-boot-starter-security")
+    implementation("org.springframework.boot:spring-boot-starter-amqp")
     implementation("org.springframework.cloud:spring-cloud-starter-vault-config:4.1.3")
 
     // --- Observabilidad (Actuator + Prometheus) ---

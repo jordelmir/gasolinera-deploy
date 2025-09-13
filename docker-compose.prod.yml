@@ -1,158 +1,1125 @@
+# Docker Compose for Production Environment
+# Optimized for security, performance, scalability, and reliability
+
 version: '3.8'
 
 services:
-  postgres:
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-    volumes:
-      - postgres_prod_data:/var/lib/postgresql/data
-    restart: unless-stopped
+  # =============================================================================
+  # INFRASTRUCTURE SERVICES - PRODUCTION GRADE
+  # =============================================================================
 
-  redis:
-    volumes:
-      - redis_prod_data:/data
-    restart: unless-stopped
-    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
-
-  rabbitmq:
+  postgres-primary:
+    image: postgres:15-alpine
+    container_name: gasolinera-postgres-primary-prod
     environment:
-      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-gasolinera_jsm}
+      POSTGRES_USER: ${POSTGRES_USER:-gasolinera_user}
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+      POSTGRES_INITDB_ARGS: '--encoding=UTF8 --locale=C --data-checksums'
+      # Production optimizations
+      POSTGRES_SHARED_PRELOAD_LIBRARIES: 'pg_stat_statements,pg_buffercache,pg_prewarm'
+      POSTGRES_MAX_CONNECTIONS: '200'
+      POSTGRES_SHARED_BUFFERS: '512MB'
+      POSTGRES_EFFECTIVE_CACHE_SIZE: '2GB'
+      POSTGRES_MAINTENANCE_WORK_MEM: '128MB'
+      POSTGRES_CHECKPOINT_COMPLETION_TARGET: '0.9'
+      POSTGRES_WAL_BUFFERS: '32MB'
+      POSTGRES_DEFAULT_STATISTICS_TARGET: '100'
+      POSTGRES_RANDOM_PAGE_COST: '1.1'
+      POSTGRES_EFFECTIVE_IO_CONCURRENCY: '200'
     volumes:
-      - rabbitmq_prod_data:/var/lib/rabbitmq
+      - postgres_primary_data:/var/lib/postgresql/data
+      - ./database/migrations:/docker-entrypoint-initdb.d/migrations:ro
+      - ./database/prod-config/postgresql.conf:/etc/postgresql/postgresql.conf:ro
+      - ./database/prod-config/pg_hba.conf:/etc/postgresql/pg_hba.conf:ro
+      - postgres_logs:/var/log/postgresql
+    command: >
+      postgres
+      -c config_file=/etc/postgresql/postgresql.conf
+      -c hba_file=/etc/postgresql/pg_hba.conf
+      -c shared_preload_libraries=pg_stat_statements,pg_buffercache,pg_prewarm
+      -c logging_collector=on
+      -c log_directory=/var/log/postgresql
+      -c log_filename=postgresql-%Y-%m-%d_%H%M%S.log
+      -c log_rotation_age=1d
+      -c log_rotation_size=100MB
+      -c log_min_duration_statement=1000
+      -c log_checkpoints=on
+      -c log_connections=on
+      -c log_disconnections=on
+      -c log_lock_waits=on
+      -c log_statement=ddl
+      -c log_line_prefix='%t [%p]: [%l-1] user=%u,db=%d,app=%a,client=%h '
+    secrets:
+      - postgres_password
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          'pg_isready -U ${POSTGRES_USER:-gasolinera_user} -d ${POSTGRES_DB:-gasolinera_jsm}',
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '2.0'
+        reservations:
+          memory: 1G
+          cpus: '1.0'
+    networks:
+      - gasolinera-prod-network
+    logging:
+      driver: 'json-file'
+      options:
+        max-size: '100m'
+        max-file: '5'
+
+  postgres-replica:
+    image: postgres:15-alpine
+    container_name: gasolinera-postgres-replica-prod
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-gasolinera_jsm}
+      POSTGRES_USER: ${POSTGRES_USER:-gasolinera_user}
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+      POSTGRES_PRIMARY_HOST: postgres-primary
+      POSTGRES_PRIMARY_PORT: 5432
+      POSTGRES_REPLICA_USER: ${POSTGRES_REPLICA_USER:-replica_user}
+      POSTGRES_REPLICA_PASSWORD_FILE: /run/secrets/postgres_replica_password
+    volumes:
+      - postgres_replica_data:/var/lib/postgresql/data
+      - ./database/prod-config/postgresql-replica.conf:/etc/postgresql/postgresql.conf:ro
+      - ./scripts/setup-replica.sh:/docker-entrypoint-initdb.d/setup-replica.sh:ro
+    command: >
+      postgres
+      -c config_file=/etc/postgresql/postgresql.conf
+      -c hot_standby=on
+      -c max_standby_streaming_delay=30s
+      -c wal_receiver_status_interval=10s
+      -c hot_standby_feedback=on
+    secrets:
+      - postgres_password
+      - postgres_replica_password
+    depends_on:
+      postgres-primary:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          'pg_isready -U ${POSTGRES_USER:-gasolinera_user} -d ${POSTGRES_DB:-gasolinera_jsm}',
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
+    networks:
+      - gasolinera-prod-network
+    logging:
+      driver: 'json-file'
+      options:
+        max-size: '100m'
+        max-file: '3'
+
+  redis-primary:
+    image: redis:7-alpine
+    container_name: gasolinera-redis-primary-prod
+    volumes:
+      - redis_primary_data:/data
+      - ./config/redis/redis-prod.conf:/usr/local/etc/redis/redis.conf:ro
+      - redis_logs:/var/log/redis
+    command: >
+      redis-server /usr/local/etc/redis/redis.conf
+      --requirepass ${REDIS_PASSWORD}
+      --masterauth ${REDIS_PASSWORD}
+      --maxmemory 1gb
+      --maxmemory-policy allkeys-lru
+      --save 900 1
+      --save 300 10
+      --save 60 10000
+      --appendonly yes
+      --appendfsync everysec
+      --auto-aof-rewrite-percentage 100
+      --auto-aof-rewrite-min-size 64mb
+      --tcp-keepalive 300
+      --timeout 0
+      --tcp-backlog 511
+      --databases 16
+      --logfile /var/log/redis/redis.log
+      --loglevel notice
+    healthcheck:
+      test: ['CMD', 'redis-cli', '--raw', 'incr', 'ping']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 1.5G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
+    networks:
+      - gasolinera-prod-network
+    logging:
+      driver: 'json-file'
+      options:
+        max-size: '50m'
+        max-file: '3'
+
+  redis-replica:
+    image: redis:7-alpine
+    container_name: gasolinera-redis-replica-prod
+    volumes:
+      - redis_replica_data:/data
+      - ./config/redis/redis-replica-prod.conf:/usr/local/etc/redis/redis.conf:ro
+    command: >
+      redis-server /usr/local/etc/redis/redis.conf
+      --requirepass ${REDIS_PASSWORD}
+      --masterauth ${REDIS_PASSWORD}
+      --replicaof redis-primary 6379
+      --replica-read-only yes
+      --replica-serve-stale-data yes
+      --replica-priority 100
+    depends_on:
+      redis-primary:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'redis-cli', '--raw', 'incr', 'ping']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
+    networks:
+      - gasolinera-prod-network
+    logging:
+      driver: 'json-file'
+      options:
+        max-size: '50m'
+        max-file: '3'
+
+  rabbitmq-primary:
+    image: rabbitmq:3.12-management-alpine
+    container_name: gasolinera-rabbitmq-primary-prod
+    environment:
+      RABBITMQ_DEFAULT_USER_FILE: /run/secrets/rabbitmq_user
+      RABBITMQ_DEFAULT_PASS_FILE: /run/secrets/rabbitmq_password
+      RABBITMQ_DEFAULT_VHOST: ${RABBITMQ_VIRTUAL_HOST:-gasolinera_vhost}
+      RABBITMQ_ERLANG_COOKIE_FILE: /run/secrets/rabbitmq_erlang_cookie
+      # Production optimizations
+      RABBITMQ_VM_MEMORY_HIGH_WATERMARK: 0.6
+      RABBITMQ_DISK_FREE_LIMIT: 2GB
+      RABBITMQ_HEARTBEAT: 60
+      RABBITMQ_FRAME_MAX: 131072
+      RABBITMQ_CHANNEL_MAX: 2047
+      RABBITMQ_CONNECTION_MAX: 1000
+      RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS: '-rabbit log_levels [{connection,error},{default,info}] disk_free_limit 2147483648'
+    volumes:
+      - rabbitmq_primary_data:/var/lib/rabbitmq
+      - ./config/rabbitmq/prod-definitions.json:/etc/rabbitmq/definitions.json:ro
+      - ./config/rabbitmq/rabbitmq-prod.conf:/etc/rabbitmq/rabbitmq.conf:ro
+      - ./config/rabbitmq/enabled_plugins:/etc/rabbitmq/enabled_plugins:ro
+      - rabbitmq_logs:/var/log/rabbitmq
+    secrets:
+      - rabbitmq_user
+      - rabbitmq_password
+      - rabbitmq_erlang_cookie
+    healthcheck:
+      test: ['CMD', 'rabbitmq-diagnostics', 'ping']
+      interval: 60s
+      timeout: 30s
+      retries: 3
+      start_period: 120s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
+    networks:
+      - gasolinera-prod-network
+    logging:
+      driver: 'json-file'
+      options:
+        max-size: '100m'
+        max-file: '3'
 
   vault:
+    image: hashicorp/vault:1.15.4
+    container_name: gasolinera-vault-prod
     environment:
-      VAULT_DEV_ROOT_TOKEN_ID: ${VAULT_ROOT_TOKEN}
+      VAULT_ADDR: 'https://0.0.0.0:8200'
+      VAULT_LOCAL_CONFIG: |
+        {
+          "backend": {
+            "consul": {
+              "address": "consul:8500",
+              "path": "vault/"
+            }
+          },
+          "listener": {
+            "tcp": {
+              "address": "0.0.0.0:8200",
+              "tls_cert_file": "/vault/certs/vault.crt",
+              "tls_key_file": "/vault/certs/vault.key",
+              "tls_min_version": "tls12"
+            }
+          },
+          "ui": true,
+          "log_level": "INFO",
+          "pid_file": "/vault/vault.pid"
+        }
+    cap_add:
+      - IPC_LOCK
     volumes:
-      - vault_prod_data:/vault/data
+      - vault_data:/vault/data
+      - vault_logs:/vault/logs
+      - ./infrastructure/vault/certs:/vault/certs:ro
+      - ./infrastructure/vault/config:/vault/config:ro
+      - ./infrastructure/vault/policies:/vault/policies:ro
+    command: 'vault server -config=/vault/config/vault.hcl'
+    depends_on:
+      - consul
+    healthcheck:
+      test: ['CMD', 'vault', 'status']
+      interval: 60s
+      timeout: 30s
+      retries: 3
+      start_period: 120s
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
+    networks:
+      - gasolinera-prod-network
+    logging:
+      driver: 'json-file'
+      options:
+        max-size: '50m'
+        max-file: '3'
+
+  consul:
+    image: consul:1.17
+    container_name: gasolinera-consul-prod
+    environment:
+      CONSUL_BIND_INTERFACE: eth0
+      CONSUL_CLIENT_INTERFACE: eth0
+    volumes:
+      - consul_data:/consul/data
+      - consul_logs:/consul/logs
+      - ./infrastructure/consul/config:/consul/config:ro
+    command: >
+      consul agent
+      -server
+      -bootstrap-expect=1
+      -data-dir=/consul/data
+      -config-dir=/consul/config
+      -ui-content-path=/ui/
+      -log-level=INFO
+      -enable-script-checks=false
+    healthcheck:
+      test: ['CMD', 'consul', 'members']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.25'
+        reservations:
+          memory: 128M
+          cpus: '0.1'
+    networks:
+      - gasolinera-prod-network
+    logging:
+      driver: 'json-file'
+      options:
+        max-size: '50m'
+        max-file: '3'
+
+  # =============================================================================
+  # OBSERVABILITY STACK - PRODUCTION GRADE
+  # =============================================================================
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.52
+    container_name: gasolinera-jaeger-prod
+    environment:
+      COLLECTOR_OTLP_ENABLED: true
+      SPAN_STORAGE_TYPE: elasticsearch
+      ES_SERVER_URLS: http://elasticsearch:9200
+      ES_USERNAME: ${ELASTICSEARCH_USERNAME:-elastic}
+      ES_PASSWORD_FILE: /run/secrets/elasticsearch_password
+      JAEGER_DISABLED: false
+      COLLECTOR_ZIPKIN_HOST_PORT: 9411
+    volumes:
+      - jaeger_data:/tmp
+    secrets:
+      - elasticsearch_password
+    depends_on:
+      - elasticsearch
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'wget',
+          '--no-verbose',
+          '--tries=1',
+          '--spider',
+          'http://localhost:14269/',
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.5'
+        reservations:
+          memory: 512M
+          cpus: '0.25'
+    networks:
+      - gasolinera-prod-network
+    logging:
+      driver: 'json-file'
+      options:
+        max-size: '100m'
+        max-file: '3'
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+    container_name: gasolinera-elasticsearch-prod
+    environment:
+      - node.name=elasticsearch
+      - cluster.name=gasolinera-cluster
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - 'ES_JAVA_OPTS=-Xms1g -Xmx1g'
+      - xpack.security.enabled=true
+      - xpack.security.authc.api_key.enabled=true
+      - ELASTIC_PASSWORD_FILE=/run/secrets/elasticsearch_password
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+      - elasticsearch_logs:/usr/share/elasticsearch/logs
+    secrets:
+      - elasticsearch_password
+    healthcheck:
+      test:
+        ['CMD-SHELL', 'curl -f http://localhost:9200/_cluster/health || exit 1']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.0'
+        reservations:
+          memory: 1G
+          cpus: '0.5'
+    networks:
+      - gasolinera-prod-network
+    logging:
+      driver: 'json-file'
+      options:
+        max-size: '100m'
+        max-file: '3'
+
+  prometheus:
+    image: prom/prometheus:v2.48.0
+    container_name: gasolinera-prometheus-prod
+    volumes:
+      - prometheus_data:/prometheus
+      - ./infrastructure/monitoring/prometheus-prod.yml:/etc/prometheus/prometheus.yml:ro
+      - ./infrastructure/monitoring/rules:/etc/prometheus/rules:ro
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=30d'
+      - '--storage.tsdb.retention.size=10GB'
+      - '--web.enable-lifecycle'
+      - '--web.enable-admin-api'
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'wget',
+          '--no-verbose',
+          '--tries=1',
+          '--spider',
+          'http://localhost:9090/-/healthy',
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
+    networks:
+      - gasolinera-prod-network
+    logging:
+      driver: 'json-file'
+      options:
+        max-size: '100m'
+        max-file: '3'
+
+  grafana:
+    image: grafana/grafana:10.2.0
+    container_name: gasolinera-grafana-prod
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD_FILE=/run/secrets/grafana_admin_password
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SECURITY_DISABLE_GRAVATAR=true
+      - GF_ANALYTICS_REPORTING_ENABLED=false
+      - GF_ANALYTICS_CHECK_FOR_UPDATES=false
+      - GF_INSTALL_PLUGINS=grafana-piechart-panel,grafana-worldmap-panel
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./infrastructure/monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./infrastructure/monitoring/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+    secrets:
+      - grafana_admin_password
+    depends_on:
+      - prometheus
+    healthcheck:
+      test: ['CMD-SHELL', 'curl -f http://localhost:3000/api/health || exit 1']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
+    networks:
+      - gasolinera-prod-network
+    logging:
+      driver: 'json-file'
+      options:
+        max-size: '50m'
+        max-file: '3'
+
+  # =============================================================================
+  # MICROSERVICES - PRODUCTION OPTIMIZED
+  # =============================================================================
 
   api-gateway:
+    image: gasolinera-jsm/api-gateway:${IMAGE_TAG:-latest}
+    container_name: gasolinera-api-gateway-prod
     environment:
-      - SPRING_PROFILES_ACTIVE=production
-      - VAULT_TOKEN=${VAULT_ROOT_TOKEN}
-      - JAVA_OPTS=-Xmx1g -Xms512m
+      - SPRING_PROFILES_ACTIVE=prod
+      - VAULT_TOKEN_FILE=/run/secrets/vault_token
+      - VAULT_ADDR=https://vault:8200
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
+      - JAVA_OPTS=-Xmx1024m -Xms512m -XX:+UseG1GC -XX:+UseStringDeduplication -XX:MaxGCPauseMillis=200
+      - MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info,metrics,prometheus
+      - LOGGING_LEVEL_COM_GASOLINERAJSM=INFO
+    secrets:
+      - vault_token
+    depends_on:
+      postgres-primary:
+        condition: service_healthy
+      redis-primary:
+        condition: service_healthy
+      rabbitmq-primary:
+        condition: service_healthy
+      vault:
+        condition: service_healthy
+      auth-service:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'wget',
+          '--no-verbose',
+          '--tries=1',
+          '--spider',
+          'http://localhost:8080/actuator/health',
+        ]
+      interval: 30s
+      timeout: 15s
+      retries: 3
+      start_period: 120s
     restart: unless-stopped
     deploy:
       replicas: 2
       resources:
         limits:
           memory: 1.5G
+          cpus: '1.0'
         reservations:
           memory: 512M
+          cpus: '0.5'
+      update_config:
+        parallelism: 1
+        delay: 30s
+        failure_action: rollback
+        order: start-first
+      rollback_config:
+        parallelism: 1
+        delay: 10s
+        failure_action: pause
+        order: stop-first
+    networks:
+      - gasolinera-prod-network
+    logging:
+      driver: 'json-file'
+      options:
+        max-size: '100m'
+        max-file: '5'
 
   auth-service:
+    image: gasolinera-jsm/auth-service:${IMAGE_TAG:-latest}
+    container_name: gasolinera-auth-service-prod
     environment:
-      - SPRING_PROFILES_ACTIVE=production
-      - VAULT_TOKEN=${VAULT_ROOT_TOKEN}
-      - JAVA_OPTS=-Xmx512m -Xms256m
+      - SPRING_PROFILES_ACTIVE=prod
+      - VAULT_TOKEN_FILE=/run/secrets/vault_token
+      - VAULT_ADDR=https://vault:8200
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
+      - JAVA_OPTS=-Xmx768m -Xms384m -XX:+UseG1GC -XX:+UseStringDeduplication -XX:MaxGCPauseMillis=200
+      - MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info,metrics,prometheus
+      - LOGGING_LEVEL_COM_GASOLINERAJSM=INFO
+    secrets:
+      - vault_token
+    depends_on:
+      postgres-primary:
+        condition: service_healthy
+      redis-primary:
+        condition: service_healthy
+      vault:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'wget',
+          '--no-verbose',
+          '--tries=1',
+          '--spider',
+          'http://localhost:8080/actuator/health',
+        ]
+      interval: 30s
+      timeout: 15s
+      retries: 3
+      start_period: 90s
     restart: unless-stopped
     deploy:
+      replicas: 2
       resources:
         limits:
-          memory: 768M
+          memory: 1G
+          cpus: '0.75'
         reservations:
-          memory: 256M
+          memory: 384M
+          cpus: '0.25'
+      update_config:
+        parallelism: 1
+        delay: 30s
+        failure_action: rollback
+        order: start-first
+    networks:
+      - gasolinera-prod-network
+    logging:
+      driver: 'json-file'
+      options:
+        max-size: '100m'
+        max-file: '5'
 
   coupon-service:
+    image: gasolinera-jsm/coupon-service:${IMAGE_TAG:-latest}
+    container_name: gasolinera-coupon-service-prod
     environment:
-      - SPRING_PROFILES_ACTIVE=production
-      - VAULT_TOKEN=${VAULT_ROOT_TOKEN}
-      - JAVA_OPTS=-Xmx512m -Xms256m
+      - SPRING_PROFILES_ACTIVE=prod
+      - VAULT_TOKEN_FILE=/run/secrets/vault_token
+      - VAULT_ADDR=https://vault:8200
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
+      - JAVA_OPTS=-Xmx768m -Xms384m -XX:+UseG1GC -XX:+UseStringDeduplication -XX:MaxGCPauseMillis=200
+      - MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info,metrics,prometheus
+      - LOGGING_LEVEL_COM_GASOLINERAJSM=INFO
+    secrets:
+      - vault_token
+    depends_on:
+      postgres-primary:
+        condition: service_healthy
+      redis-primary:
+        condition: service_healthy
+      rabbitmq-primary:
+        condition: service_healthy
+      vault:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'wget',
+          '--no-verbose',
+          '--tries=1',
+          '--spider',
+          'http://localhost:8080/actuator/health',
+        ]
+      interval: 30s
+      timeout: 15s
+      retries: 3
+      start_period: 90s
     restart: unless-stopped
     deploy:
+      replicas: 2
       resources:
         limits:
-          memory: 768M
+          memory: 1G
+          cpus: '0.75'
         reservations:
-          memory: 256M
+          memory: 384M
+          cpus: '0.25'
+      update_config:
+        parallelism: 1
+        delay: 30s
+        failure_action: rollback
+        order: start-first
+    networks:
+      - gasolinera-prod-network
+    logging:
+      driver: 'json-file'
+      options:
+        max-size: '100m'
+        max-file: '5'
 
   station-service:
+    image: gasolinera-jsm/station-service:${IMAGE_TAG:-latest}
+    container_name: gasolinera-station-service-prod
     environment:
-      - SPRING_PROFILES_ACTIVE=production
-      - VAULT_TOKEN=${VAULT_ROOT_TOKEN}
-      - JAVA_OPTS=-Xmx512m -Xms256m
+      - SPRING_PROFILES_ACTIVE=prod
+      - VAULT_TOKEN_FILE=/run/secrets/vault_token
+      - VAULT_ADDR=https://vault:8200
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
+      - JAVA_OPTS=-Xmx768m -Xms384m -XX:+UseG1GC -XX:+UseStringDeduplication -XX:MaxGCPauseMillis=200
+      - MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info,metrics,prometheus
+      - LOGGING_LEVEL_COM_GASOLINERAJSM=INFO
+    secrets:
+      - vault_token
+    depends_on:
+      postgres-primary:
+        condition: service_healthy
+      vault:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'wget',
+          '--no-verbose',
+          '--tries=1',
+          '--spider',
+          'http://localhost:8080/actuator/health',
+        ]
+      interval: 30s
+      timeout: 15s
+      retries: 3
+      start_period: 90s
     restart: unless-stopped
-
-  ad-engine:
-    environment:
-      - SPRING_PROFILES_ACTIVE=production
-      - VAULT_TOKEN=${VAULT_ROOT_TOKEN}
-      - JAVA_OPTS=-Xmx512m -Xms256m
-    restart: unless-stopped
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.75'
+        reservations:
+          memory: 384M
+          cpus: '0.25'
+      update_config:
+        parallelism: 1
+        delay: 30s
+        failure_action: rollback
+        order: start-first
+    networks:
+      - gasolinera-prod-network
+    logging:
+      driver: 'json-file'
+      options:
+        max-size: '100m'
+        max-file: '5'
 
   raffle-service:
+    image: gasolinera-jsm/raffle-service:${IMAGE_TAG:-latest}
+    container_name: gasolinera-raffle-service-prod
     environment:
-      - SPRING_PROFILES_ACTIVE=production
-      - VAULT_TOKEN=${VAULT_ROOT_TOKEN}
-      - JAVA_OPTS=-Xmx512m -Xms256m
+      - SPRING_PROFILES_ACTIVE=prod
+      - VAULT_TOKEN_FILE=/run/secrets/vault_token
+      - VAULT_ADDR=https://vault:8200
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
+      - JAVA_OPTS=-Xmx768m -Xms384m -XX:+UseG1GC -XX:+UseStringDeduplication -XX:MaxGCPauseMillis=200
+      - MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info,metrics,prometheus
+      - LOGGING_LEVEL_COM_GASOLINERAJSM=INFO
+    secrets:
+      - vault_token
+    depends_on:
+      postgres-primary:
+        condition: service_healthy
+      redis-primary:
+        condition: service_healthy
+      rabbitmq-primary:
+        condition: service_healthy
+      vault:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'wget',
+          '--no-verbose',
+          '--tries=1',
+          '--spider',
+          'http://localhost:8080/actuator/health',
+        ]
+      interval: 30s
+      timeout: 15s
+      retries: 3
+      start_period: 90s
     restart: unless-stopped
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.75'
+        reservations:
+          memory: 384M
+          cpus: '0.25'
+      update_config:
+        parallelism: 1
+        delay: 30s
+        failure_action: rollback
+        order: start-first
+    networks:
+      - gasolinera-prod-network
+    logging:
+      driver: 'json-file'
+      options:
+        max-size: '100m'
+        max-file: '5'
 
   redemption-service:
+    image: gasolinera-jsm/redemption-service:${IMAGE_TAG:-latest}
+    container_name: gasolinera-redemption-service-prod
     environment:
-      - SPRING_PROFILES_ACTIVE=production
-      - VAULT_TOKEN=${VAULT_ROOT_TOKEN}
-      - JAVA_OPTS=-Xmx512m -Xms256m
-    restart: unless-stopped
-
-  owner-dashboard:
-    environment:
-      - NODE_ENV=production
-      - NEXT_PUBLIC_API_URL=${API_GATEWAY_URL}
-    restart: unless-stopped
-
-  # Nginx reverse proxy for production
-  nginx:
-    image: nginx:alpine
-    container_name: nginx-proxy
-    ports:
-      - '80:80'
-      - '443:443'
-    volumes:
-      - ./infra/nginx/nginx.conf:/etc/nginx/nginx.conf
-      - ./infra/nginx/ssl:/etc/nginx/ssl
+      - SPRING_PROFILES_ACTIVE=prod
+      - VAULT_TOKEN_FILE=/run/secrets/vault_token
+      - VAULT_ADDR=https://vault:8200
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
+      - JAVA_OPTS=-Xmx768m -Xms384m -XX:+UseG1GC -XX:+UseStringDeduplication -XX:MaxGCPauseMillis=200
+      - MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info,metrics,prometheus
+      - LOGGING_LEVEL_COM_GASOLINERAJSM=INFO
+    secrets:
+      - vault_token
     depends_on:
-      - api-gateway
-      - owner-dashboard
+      postgres-primary:
+        condition: service_healthy
+      redis-primary:
+        condition: service_healthy
+      rabbitmq-primary:
+        condition: service_healthy
+      vault:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'wget',
+          '--no-verbose',
+          '--tries=1',
+          '--spider',
+          'http://localhost:8080/actuator/health',
+        ]
+      interval: 30s
+      timeout: 15s
+      retries: 3
+      start_period: 90s
     restart: unless-stopped
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.75'
+        reservations:
+          memory: 384M
+          cpus: '0.25'
+      update_config:
+        parallelism: 1
+        delay: 30s
+        failure_action: rollback
+        order: start-first
+    networks:
+      - gasolinera-prod-network
+    logging:
+      driver: 'json-file'
+      options:
+        max-size: '100m'
+        max-file: '5'
 
-  # Monitoring stack
-  prometheus:
-    image: prom/prometheus:latest
-    container_name: prometheus
-    ports:
-      - '9090:9090'
-    volumes:
-      - ./infra/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
-      - prometheus_data:/prometheus
-    command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
-      - '--web.console.libraries=/etc/prometheus/console_libraries'
-      - '--web.console.templates=/etc/prometheus/consoles'
-    restart: unless-stopped
-
-  grafana:
-    image: grafana/grafana:latest
-    container_name: grafana
-    ports:
-      - '3001:3000'
+  ad-engine:
+    image: gasolinera-jsm/ad-engine:${IMAGE_TAG:-latest}
+    container_name: gasolinera-ad-engine-prod
     environment:
-      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
-    volumes:
-      - grafana_data:/var/lib/grafana
-      - ./infra/monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards
-      - ./infra/monitoring/grafana/datasources:/etc/grafana/provisioning/datasources
+      - SPRING_PROFILES_ACTIVE=prod
+      - VAULT_TOKEN_FILE=/run/secrets/vault_token
+      - VAULT_ADDR=https://vault:8200
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
+      - JAVA_OPTS=-Xmx768m -Xms384m -XX:+UseG1GC -XX:+UseStringDeduplication -XX:MaxGCPauseMillis=200
+      - MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info,metrics,prometheus
+      - LOGGING_LEVEL_COM_GASOLINERAJSM=INFO
+    secrets:
+      - vault_token
+    depends_on:
+      postgres-primary:
+        condition: service_healthy
+      vault:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'wget',
+          '--no-verbose',
+          '--tries=1',
+          '--spider',
+          'http://localhost:8080/actuator/health',
+        ]
+      interval: 30s
+      timeout: 15s
+      retries: 3
+      start_period: 90s
     restart: unless-stopped
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.75'
+        reservations:
+          memory: 384M
+          cpus: '0.25'
+      update_config:
+        parallelism: 1
+        delay: 30s
+        failure_action: rollback
+        order: start-first
+    networks:
+      - gasolinera-prod-network
+    logging:
+      driver: 'json-file'
+      options:
+        max-size: '100m'
+        max-file: '5'
 
+# =============================================================================
+# SECRETS - PRODUCTION SECURITY
+# =============================================================================
+secrets:
+  postgres_password:
+    external: true
+    name: gasolinera_postgres_password
+  postgres_replica_password:
+    external: true
+    name: gasolinera_postgres_replica_password
+  rabbitmq_user:
+    external: true
+    name: gasolinera_rabbitmq_user
+  rabbitmq_password:
+    external: true
+    name: gasolinera_rabbitmq_password
+  rabbitmq_erlang_cookie:
+    external: true
+    name: gasolinera_rabbitmq_erlang_cookie
+  vault_token:
+    external: true
+    name: gasolinera_vault_token
+  elasticsearch_password:
+    external: true
+    name: gasolinera_elasticsearch_password
+  grafana_admin_password:
+    external: true
+    name: gasolinera_grafana_admin_password
+
+# =============================================================================
+# VOLUMES - PRODUCTION PERSISTENT STORAGE
+# =============================================================================
 volumes:
-  postgres_prod_data:
-  redis_prod_data:
-  rabbitmq_prod_data:
-  vault_prod_data:
+  postgres_primary_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /opt/gasolinera/data/postgres-primary
+  postgres_replica_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /opt/gasolinera/data/postgres-replica
+  postgres_logs:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /opt/gasolinera/logs/postgres
+  redis_primary_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /opt/gasolinera/data/redis-primary
+  redis_replica_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /opt/gasolinera/data/redis-replica
+  redis_logs:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /opt/gasolinera/logs/redis
+  rabbitmq_primary_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /opt/gasolinera/data/rabbitmq-primary
+  rabbitmq_logs:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /opt/gasolinera/logs/rabbitmq
+  vault_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /opt/gasolinera/data/vault
+  vault_logs:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /opt/gasolinera/logs/vault
+  consul_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /opt/gasolinera/data/consul
+  consul_logs:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /opt/gasolinera/logs/consul
+  elasticsearch_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /opt/gasolinera/data/elasticsearch
+  elasticsearch_logs:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /opt/gasolinera/logs/elasticsearch
   prometheus_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /opt/gasolinera/data/prometheus
   grafana_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /opt/gasolinera/data/grafana
+  jaeger_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /opt/gasolinera/data/jaeger
+
+# =============================================================================
+# NETWORKS - PRODUCTION NETWORKING
+# =============================================================================
+networks:
+  gasolinera-prod-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.22.0.0/16
+          gateway: 172.22.0.1
+    driver_opts:
+      com.docker.network.bridge.name: gasolinera-prod-br0
+      com.docker.network.driver.mtu: 1500
+      com.docker.network.bridge.enable_icc: 'true'
+      com.docker.network.bridge.enable_ip_masquerade: 'true'

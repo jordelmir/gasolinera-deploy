@@ -1,0 +1,103 @@
+# Docker Compose for Testing Environment
+# Provides isolated containers for integration and E2E tests
+
+version: '3.8'
+
+services:
+  # Test PostgreSQL Database
+  postgres-test:
+    image: postgres:15
+    container_name: gasolinera-postgres-test
+    environment:
+      POSTGRES_DB: gasolinera_jsm_test
+      POSTGRES_USER: test_user
+      POSTGRES_PASSWORD: test_password
+      POSTGRES_INITDB_ARGS: '--encoding=UTF-8 --lc-collate=C --lc-ctype=C'
+    ports:
+      - '5433:5432'
+    volumes:
+      - postgres_test_data:/var/lib/postgresql/data
+      - ./scripts/init-test-db.sql:/docker-entrypoint-initdb.d/init-test-db.sql
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U test_user -d gasolinera_jsm_test']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - test-network
+
+  # Test Redis Cache
+  redis-test:
+    image: redis:7-alpine
+    container_name: gasolinera-redis-test
+    ports:
+      - '6380:6379'
+    command: redis-server --appendonly yes --requirepass test_password
+    volumes:
+      - redis_test_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', '--raw', 'incr', 'ping']
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - test-network
+
+  # Test RabbitMQ Message Queue
+  rabbitmq-test:
+    image: rabbitmq:3-management
+    container_name: gasolinera-rabbitmq-test
+    environment:
+      RABBITMQ_DEFAULT_USER: test_user
+      RABBITMQ_DEFAULT_PASS: test_password
+      RABBITMQ_DEFAULT_VHOST: test_vhost
+    ports:
+      - '5673:5672'
+      - '15673:15672'
+    volumes:
+      - rabbitmq_test_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ['CMD', 'rabbitmq-diagnostics', 'ping']
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    networks:
+      - test-network
+
+  # Test Jaeger for Tracing
+  jaeger-test:
+    image: jaegertracing/all-in-one:latest
+    container_name: gasolinera-jaeger-test
+    environment:
+      COLLECTOR_OTLP_ENABLED: true
+    ports:
+      - '16687:16686' # Jaeger UI
+      - '14269:14268' # Jaeger collector HTTP
+      - '4318:4317' # OTLP gRPC receiver
+    networks:
+      - test-network
+
+  # Test Mailhog for Email Testing
+  mailhog-test:
+    image: mailhog/mailhog:latest
+    container_name: gasolinera-mailhog-test
+    ports:
+      - '1026:1025' # SMTP
+      - '8026:8025' # Web UI
+    networks:
+      - test-network
+
+volumes:
+  postgres_test_data:
+    driver: local
+  redis_test_data:
+    driver: local
+  rabbitmq_test_data:
+    driver: local
+
+networks:
+  test-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
