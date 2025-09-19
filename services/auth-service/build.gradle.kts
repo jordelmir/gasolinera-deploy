@@ -54,7 +54,7 @@ dependencies {
     runtimeOnly("io.jsonwebtoken:jjwt-jackson:0.11.5")
 
     // --- OpenAPI/Swagger ---
-    implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.2.0")
+    implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.13")
 
     // --- Jakarta Servlet API ---
     implementation("jakarta.servlet:jakarta.servlet-api:6.0.0")
