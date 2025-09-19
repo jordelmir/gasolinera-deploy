@@ -2,11 +2,29 @@
   "version": 2,
   "builds": [
     {
-      "src": "package.json",
-      "use": "@vercel/static-build",
+      "src": "apps/owner-dashboard/package.json",
+      "use": "@vercel/next",
       "config": {
-        "distDir": "dist/apps/admin"
+        "projectSettings": {
+          "framework": "nextjs",
+          "rootDirectory": "apps/owner-dashboard"
+        }
       }
     }
-  ]
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "/apps/owner-dashboard/$1"
+    }
+  ],
+  "buildCommand": "cd apps/owner-dashboard && npm run build",
+  "outputDirectory": "apps/owner-dashboard/.next",
+  "installCommand": "npm install",
+  "framework": "nextjs",
+  "functions": {
+    "apps/owner-dashboard/pages/api/**/*.js": {
+      "runtime": "nodejs18.x"
+    }
+  }
 }

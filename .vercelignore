@@ -1,0 +1,36 @@
+# Build outputs
+build/
+dist/
+.next/
+out/
+
+# Dependencies
+node_modules/
+
+# Cache
+.nx/
+.cache/
+
+# IDE
+.idea/
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Environment (keep examples)
+.env.local
+.env.*.local
+
+# Gradle/Java (no necesarios para frontend)
+.gradle/
+*.jar
+*.class
+
+# Test coverage
+coverage/
