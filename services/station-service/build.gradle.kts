@@ -48,7 +48,7 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-actuator")
 
     // Vault Configuration
-    implementation("org.springframework.cloud:spring-cloud-starter-vault-config:4.1.3")
+    implementation("org.springframework.cloud:spring-cloud-starter-vault-config:4.3.0")
 
     // Database
     implementation("org.flywaydb:flyway-core")
