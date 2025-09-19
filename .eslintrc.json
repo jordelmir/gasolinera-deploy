@@ -1,11 +1,26 @@
 {
   "root": true,
   "ignorePatterns": [
-    "**/*"
+    "node_modules",
+    "dist",
+    "build",
+    ".next",
+    "coverage",
+    "*.config.js"
   ],
   "plugins": [
     "@nx"
   ],
+  "env": {
+    "browser": true,
+    "node": true,
+    "es6": true,
+    "jest": true
+  },
+  "globals": {
+    "React": "readonly",
+    "JSX": "readonly"
+  },
   "overrides": [
     {
       "files": [
@@ -38,21 +53,58 @@
         "*.tsx"
       ],
       "extends": [
-        "@typescript-eslint/recommended"
+        "eslint:recommended"
       ],
       "parser": "@typescript-eslint/parser",
+      "plugins": [
+        "@typescript-eslint"
+      ],
       "parserOptions": {
         "ecmaVersion": 2020,
-        "sourceType": "module"
+        "sourceType": "module",
+        "ecmaFeatures": {
+          "jsx": true
+        }
+      },
+      "env": {
+        "browser": true,
+        "node": true,
+        "es6": true
+      },
+      "globals": {
+        "React": "readonly",
+        "JSX": "readonly",
+        "HTMLElement": "readonly",
+        "HTMLDivElement": "readonly",
+        "HTMLButtonElement": "readonly",
+        "HTMLInputElement": "readonly",
+        "HTMLTableElement": "readonly",
+        "HTMLTableSectionElement": "readonly",
+        "HTMLTableRowElement": "readonly",
+        "HTMLTableCellElement": "readonly",
+        "HTMLTableCaptionElement": "readonly",
+        "HTMLParagraphElement": "readonly",
+        "HTMLHeadingElement": "readonly",
+        "HTMLSpanElement": "readonly",
+        "RequestInit": "readonly",
+        "fetch": "readonly",
+        "URL": "readonly",
+        "localStorage": "readonly",
+        "process": "readonly",
+        "console": "readonly",
+        "alert": "readonly",
+        "confirm": "readonly"
       },
       "rules": {
         "@typescript-eslint/no-unused-vars": [
-          "error",
+          "warn",
           {
             "argsIgnorePattern": "^_"
           }
         ],
-        "@typescript-eslint/no-explicit-any": "warn"
+        "@typescript-eslint/no-explicit-any": "warn",
+        "no-unused-vars": "off",
+        "no-undef": "off"
       }
     },
     {
@@ -65,15 +117,39 @@
       ],
       "env": {
         "node": true,
-        "es6": true
+        "es6": true,
+        "browser": true
+      },
+      "globals": {
+        "React": "readonly",
+        "JSX": "readonly"
       },
       "rules": {
         "no-unused-vars": [
-          "error",
+          "warn",
           {
             "argsIgnorePattern": "^_"
           }
         ]
+      }
+    },
+    {
+      "files": [
+        "**/*.test.{ts,tsx,js,jsx}",
+        "**/*.spec.{ts,tsx,js,jsx}"
+      ],
+      "env": {
+        "jest": true,
+        "node": true
+      },
+      "globals": {
+        "describe": "readonly",
+        "it": "readonly",
+        "expect": "readonly",
+        "beforeEach": "readonly",
+        "afterEach": "readonly",
+        "beforeAll": "readonly",
+        "afterAll": "readonly"
       }
     }
   ]
