@@ -38,7 +38,7 @@ repositories {
 }
 
 dependencies {
-    detektPlugins("io.gitlab.arturbosch.detekt:detekt-formatting:1.23.7")
+    detektPlugins("io.gitlab.arturbosch.detekt:detekt-formatting:1.23.8")
 
     // Spring Boot Starters
     implementation("org.springframework.boot:spring-boot-starter-web")

@@ -10,7 +10,7 @@ plugins {
     // Quality and Security plugins
     id("org.sonarqube") version "4.4.1.3373"
     id("jacoco")
-    id("io.gitlab.arturbosch.detekt") version "1.23.4"
+    id("io.gitlab.arturbosch.detekt") version "1.23.8"
     id("org.jlleitschuh.gradle.ktlint") version "11.6.1"
     id("com.github.ben-manes.versions") version "0.50.0"
     id("org.owasp.dependencycheck") version "9.0.7"
@@ -194,8 +194,8 @@ subprojects {
         testImplementation("org.testcontainers:rabbitmq")
 
         // Detekt plugins
-        detektPlugins("io.gitlab.arturbosch.detekt:detekt-formatting:1.23.4")
-        detektPlugins("io.gitlab.arturbosch.detekt:detekt-rules-libraries:1.23.4")
+        detektPlugins("io.gitlab.arturbosch.detekt:detekt-formatting:1.23.8")
+        detektPlugins("io.gitlab.arturbosch.detekt:detekt-rules-libraries:1.23.8")
     }
 }
 

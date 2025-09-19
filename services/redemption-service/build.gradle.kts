@@ -38,7 +38,7 @@ repositories {
 }
 
 dependencies {
-    detektPlugins("io.gitlab.arturbosch.detekt:detekt-formatting:1.23.7") // Detekt formatting rules
+    detektPlugins("io.gitlab.arturbosch.detekt:detekt-formatting:1.23.8") // Detekt formatting rules
 
     // --- Shared Modules ---
     implementation(project(":shared:messaging"))
