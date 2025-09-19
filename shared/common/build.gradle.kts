@@ -54,7 +54,7 @@ dependencies {
     testImplementation("org.springframework:spring-test:6.1.2")
     testImplementation("org.springframework:spring-web:6.1.2")
 
-    testImplementation("io.mockk:mockk:1.13.8")
+    testImplementation("io.mockk:mockk:1.14.5")
 
     // Test Fixtures dependencies
     testFixturesApi("org.springframework.boot:spring-boot-starter-test")
@@ -62,7 +62,7 @@ dependencies {
     testFixturesApi("org.springframework:spring-web:6.1.2")
     testFixturesApi("io.kotest:kotest-runner-junit5:5.8.0")
     testFixturesApi("io.kotest:kotest-assertions-core:5.8.0")
-    testFixturesApi("io.mockk:mockk:1.13.8")
+    testFixturesApi("io.mockk:mockk:1.14.5")
     testFixturesApi("org.testcontainers:junit-jupiter:1.19.3")
     testFixturesApi("org.testcontainers:postgresql:1.19.3")
     testFixturesApi("org.testcontainers:rabbitmq:1.19.3")
