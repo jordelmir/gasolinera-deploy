@@ -78,8 +78,8 @@ dependencies {
     testImplementation("com.h2database:h2")
 
     // --- Test Containers (for integration tests) ---
-    testImplementation("org.testcontainers:junit-jupiter:1.19.7")
-    testImplementation("org.testcontainers:postgresql:1.19.7")
+    testImplementation("org.testcontainers:junit-jupiter:1.21.3")
+    testImplementation("org.testcontainers:postgresql:1.21.3")
 
 
     // --- MockK for Kotlin mocking ---

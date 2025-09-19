@@ -40,9 +40,9 @@ dependencies {
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
     implementation("org.springframework:spring-web:6.1.2")
     testImplementation("jakarta.servlet:jakarta.servlet-api:6.0.0")
-    testImplementation("org.testcontainers:junit-jupiter:1.19.3")
-    testImplementation("org.testcontainers:postgresql:1.19.3")
-    testImplementation("org.testcontainers:rabbitmq:1.19.3")
+    testImplementation("org.testcontainers:junit-jupiter:1.21.3")
+    testImplementation("org.testcontainers:postgresql:1.21.3")
+    testImplementation("org.testcontainers:rabbitmq:1.21.3")
 
     // Kotest for testing
     testImplementation("io.kotest:kotest-runner-junit5:5.8.0")
@@ -63,9 +63,9 @@ dependencies {
     testFixturesApi("io.kotest:kotest-runner-junit5:5.8.0")
     testFixturesApi("io.kotest:kotest-assertions-core:5.8.0")
     testFixturesApi("io.mockk:mockk:1.13.8")
-    testFixturesApi("org.testcontainers:junit-jupiter:1.19.3")
-    testFixturesApi("org.testcontainers:postgresql:1.19.3")
-    testFixturesApi("org.testcontainers:rabbitmq:1.19.3")
+    testFixturesApi("org.testcontainers:junit-jupiter:1.21.3")
+    testFixturesApi("org.testcontainers:postgresql:1.21.3")
+    testFixturesApi("org.testcontainers:rabbitmq:1.21.3")
 }
 
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
