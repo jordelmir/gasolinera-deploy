@@ -19,7 +19,7 @@ dependencies {
     implementation(project.files("${rootProject.buildDir}/generated/station-client/src/main/kotlin"))
 
     // Dependencies required by the generated code (e.g., Spring, Jackson, etc.)
-    implementation("org.springframework.boot:spring-boot-starter-web:3.3.3") // Use the same Spring Boot version as services
+    implementation("org.springframework.boot:spring-boot-starter-web:3.5.6") // Use the same Spring Boot version as services
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.15.2") // Use the same Jackson version
     implementation("org.jetbrains.kotlin:kotlin-reflect") // Version managed by root project
     implementation("jakarta.validation:jakarta.validation-api:3.0.2") // For @Valid annotations

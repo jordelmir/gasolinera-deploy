@@ -19,9 +19,9 @@ dependencies {
     api("com.fasterxml.jackson.module:jackson-module-kotlin")
 
     // Spring Boot dependencies with consistent versions
-    api("org.springframework.boot:spring-boot-starter:3.2.1")
-    api("org.springframework.boot:spring-boot-starter-actuator:3.2.1")
-    api("org.springframework.boot:spring-boot-starter-web:3.2.1")
+    api("org.springframework.boot:spring-boot-starter:3.5.6")
+    api("org.springframework.boot:spring-boot-starter-actuator:3.5.6")
+    api("org.springframework.boot:spring-boot-starter-web:3.5.6")
     api("org.springframework:spring-context:6.1.2")
     api("org.slf4j:slf4j-api:2.0.9")
 
