@@ -83,7 +83,7 @@ dependencies {
 
 
     // --- MockK for Kotlin mocking ---
-    testImplementation("io.mockk:mockk:1.13.8")
+    testImplementation("io.mockk:mockk:1.14.5")
     testImplementation("com.ninja-squad:springmockk:4.0.2")
 
     // --- AssertJ for better assertions ---
