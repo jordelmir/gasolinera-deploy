@@ -16,14 +16,14 @@ jobs:
     runs-on: ubuntu-latest
     if: "${{ github.event.workflow_run.conclusion == 'success' }}"
     permissions:
-      id-token: write # This is required for aws-actions/configure-aws-credentials@v4
+      id-token: write # This is required for aws-actions/configure-aws-credentials@v5
       contents: read # This is required for actions/checkout@v3
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v5
         with:
           role-to-assume: arn:aws:iam::<YOUR_AWS_ACCOUNT_ID>:role/<YOUR_GITHUB_ACTIONS_OIDC_ROLE> # Replace with your OIDC role ARN
           aws-region: ${{ env.AWS_REGION }}
