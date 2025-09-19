@@ -1,0 +1,255 @@
+server:
+  port: 8084
+  servlet:
+    context-path: /ad-engine
+
+spring:
+  application:
+    name: ad-engine-service
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/gasolinera_jsm_db
+    username: ${DB_USERNAME:gasolinera_user}
+    password: ${DB_PASSWORD:gasolinera_pass}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      idle-timeout: 300000
+      connection-timeout: 20000
+      leak-detection-threshold: 60000
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+        use_sql_comments: true
+        jdbc:
+          batch_size: 25
+        order_inserts: true
+        order_updates: true
+    open-in-view: false
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    validate-on-migrate: true
+    schemas: ad_engine_schema
+
+  redis:
+    host: ${REDIS_HOST:localhost}
+    port: ${REDIS_PORT:6379}
+    password: ${REDIS_PASSWORD:}
+    timeout: 2000ms
+    lettuce:
+      pool:
+        max-active: 8
+        max-idle: 8
+        min-idle: 0
+
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:gasolinera_user}
+    password: ${RABBITMQ_PASSWORD:gasolinera_pass}
+    virtual-host: ${RABBITMQ_VHOST:/gasolinera}
+
+  cloud:
+    vault:
+      enabled: ${VAULT_ENABLED:true}
+      host: ${VAULT_HOST:localhost}
+      port: ${VAULT_PORT:8200}
+      scheme: ${VAULT_SCHEME:http}
+      authentication: TOKEN
+      token: ${VAULT_TOKEN:dev-token}
+      kv:
+        enabled: true
+        backend: secret
+        profile-separator: '/'
+        default-context: ad-engine
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+
+logging:
+  level:
+    com.gasolinerajsm.adengine: ${LOG_LEVEL:INFO}
+    org.springframework.security: WARN
+    org.hibernate.SQL: ${SQL_LOG_LEVEL:WARN}
+    org.hibernate.type.descriptor.sql.BasicBinder: ${SQL_LOG_LEVEL:WARN}
+  pattern:
+    console: '%d{yyyy-MM-dd HH:mm:ss} - %msg%n'
+    file: '%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n'
+
+# Application specific configuration
+ad-engine:
+  # Advertisement serving settings
+  serving:
+    default-priority: 5
+    max-ads-per-request: 10
+    cache-eligible-ads-seconds: 300
+    impression-timeout-minutes: 30
+
+  # Targeting settings
+  targeting:
+    enable-location-targeting: true
+    enable-demographic-targeting: true
+    enable-behavioral-targeting: true
+    location-accuracy-threshold-meters: 1000
+
+  # Ticket multiplication settings
+  tickets:
+    default-base-tickets: 1
+    max-multiplier: 10.0
+    max-bonus-tickets: 100
+    auto-award-on-completion: true
+
+  # Engagement tracking settings
+  engagement:
+    track-view-progress: true
+    track-interactions: true
+    track-location: true
+    quality-score-threshold: 70.0
+
+  # Budget and billing settings
+  billing:
+    enable-cost-tracking: true
+    default-currency: USD
+    cost-precision: 4
+    budget-alert-threshold: 0.9
+
+  # Performance settings
+  performance:
+    enable-caching: true
+    cache-ttl-seconds: 600
+    async-event-processing: true
+    batch-size: 100
+
+# Google AdSense Integration
+google:
+  adsense:
+    enabled: ${ADSENSE_ENABLED:true}
+    publisher-id: ${ADSENSE_PUBLISHER_ID:pub-0000000000000000}
+    client-id: ${ADSENSE_CLIENT_ID:ca-pub-0000000000000000}
+
+    # AdSense API Configuration
+    api:
+      base-url: https://www.googleapis.com/adsense/v2
+      timeout-seconds: 30
+      retry-attempts: 3
+
+    # Revenue sharing configuration
+    revenue:
+      platform-share-percentage: 30.0
+      advertiser-share-percentage: 70.0
+      minimum-payout-threshold: 100.00
+
+    # Ad unit configuration
+    ad-units:
+      banner:
+        width: 728
+        height: 90
+        format: 'RESPONSIVE'
+      mobile-banner:
+        width: 320
+        height: 50
+        format: 'RESPONSIVE'
+      interstitial:
+        width: 320
+        height: 480
+        format: 'INTERSTITIAL'
+      rewarded-video:
+        width: 320
+        height: 480
+        format: 'REWARDED_VIDEO'
+
+    # Targeting and optimization
+    optimization:
+      enable-auto-ads: true
+      enable-personalized-ads: true
+      enable-frequency-capping: true
+      max-ads-per-page: 3
+
+# External service URLs
+external:
+  services:
+    auth-service:
+      url: ${AUTH_SERVICE_URL:http://localhost:8081}
+    raffle-service:
+      url: ${RAFFLE_SERVICE_URL:http://localhost:8085}
+    station-service:
+      url: ${STATION_SERVICE_URL:http://localhost:8082}
+    analytics-service:
+      url: ${ANALYTICS_SERVICE_URL:http://localhost:8087}
+
+# Security configuration
+security:
+  jwt:
+    secret: ${JWT_SECRET:ad-engine-secret-key}
+    expiration: ${JWT_EXPIRATION:86400}
+
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:8080}
+    allowed-methods: GET,POST,PUT,DELETE,OPTIONS
+    allowed-headers: '*'
+    allow-credentials: true
+
+# Message Queue Configuration
+messaging:
+  exchanges:
+    ad-completion: ad.completion
+    ad-engagement: ad.engagement
+    ticket-multiplication: ticket.multiplication
+
+  routing-keys:
+    ad-completion-ticket-award: ad.completion.ticket.award
+    ad-engagement-created: ad.engagement.created
+    ticket-multiplication-awarded: ticket.multiplication.awarded
+
+# Actuator configuration
+info:
+  app:
+    name: Ad Engine Service
+    description: Service for advertisement serving, engagement tracking, and ticket multiplication
+    version: 1.0.0
+    encoding: UTF-8
+    java:
+      version: 17
+
+# Google Gemini Configuration
+gemini:
+  api:
+    key: ${GEMINI_API_KEY:AIzaSyBInSfm7AbIJhZBkDPyNSXGx706XSebWZc}
+    base-url: https://generativelanguage.googleapis.com/v1beta
+    timeout-seconds: 30
+    model: gemini-pro
+    max-tokens: 1000
+    temperature: 0.7
+
+# Monitoring and Analytics
+monitoring:
+  metrics:
+    enable-custom-metrics: true
+    engagement-metrics: true
+    revenue-metrics: true
+    performance-metrics: true
+
+  alerts:
+    low-engagement-threshold: 10.0
+    high-error-rate-threshold: 5.0
+    budget-depletion-threshold: 90.0

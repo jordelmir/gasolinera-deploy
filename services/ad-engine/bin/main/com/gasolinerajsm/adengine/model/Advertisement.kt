@@ -1,0 +1,117 @@
+package com.gasolinerajsm.adengine.model
+
+import java.math.BigDecimal
+import java.time.LocalDateTime
+
+data class Advertisement(
+    val id: Long = 0,
+    val campaignId: Long = 0,
+    val title: String = "",
+    val description: String = "",
+    val adType: AdType = AdType.BANNER,
+    val status: AdStatus = AdStatus.DRAFT,
+    val contentUrl: String? = null,
+    val thumbnailUrl: String? = null,
+    val clickThroughUrl: String? = null,
+    val durationSeconds: Int? = null,
+    val startDate: LocalDateTime? = null,
+    val endDate: LocalDateTime? = null,
+    val priority: Int = 1,
+    val dailyBudget: BigDecimal = BigDecimal.ZERO,
+    val totalBudget: BigDecimal = BigDecimal.ZERO,
+    val costPerView: BigDecimal = BigDecimal.ZERO,
+    val costPerClick: BigDecimal = BigDecimal.ZERO,
+    val maxImpressionsPerUser: Int = 1,
+    val maxDailyImpressions: Int = 1000,
+    val totalImpressions: Int = 0,
+    val totalClicks: Int = 0,
+    val totalCompletions: Int = 0,
+    val totalSpend: BigDecimal = BigDecimal.ZERO,
+    val ticketMultiplier: Int = 1,
+    val bonusTicketsOnCompletion: Int = 0,
+    val requiresCompletionForBonus: Boolean = false,
+    val minViewTimeForBonus: Int = 0,
+    val targetAgeMin: Int? = null,
+    val targetAgeMax: Int? = null,
+    val targetGenders: List<String> = emptyList(),
+    val targetLocations: List<String> = emptyList(),
+    val targetStations: List<Long> = emptyList(),
+    val targetUserSegments: List<String> = emptyList(),
+    val excludeUserSegments: List<String> = emptyList(),
+    val allowedDaysOfWeek: List<String> = emptyList(),
+    val allowedHoursStart: Int? = null,
+    val allowedHoursEnd: Int? = null,
+    val advertiserName: String? = null,
+    val advertiserContact: String? = null,
+    val tags: List<String> = emptyList(),
+    val notes: String? = null,
+    val createdBy: String? = null,
+    val updatedBy: String? = null,
+    val createdAt: LocalDateTime = LocalDateTime.now(),
+    val updatedAt: LocalDateTime = LocalDateTime.now()
+) {
+    fun isActiveAndScheduled(): Boolean = status == AdStatus.ACTIVE && startDate?.isBefore(LocalDateTime.now()) == true && endDate?.isAfter(LocalDateTime.now()) == true
+    fun hasBudgetRemaining(): Boolean = totalSpend < totalBudget
+    fun getClickThroughRate(): Double = if (totalImpressions > 0) totalClicks.toDouble() / totalImpressions else 0.0
+    fun getCompletionRate(): Double = if (totalImpressions > 0) totalCompletions.toDouble() / totalImpressions else 0.0
+    fun getEffectiveCPM(): BigDecimal = if (totalImpressions > 0) totalSpend.multiply(BigDecimal(1000)).divide(BigDecimal(totalImpressions), 2, java.math.RoundingMode.HALF_UP) else BigDecimal.ZERO
+    fun getRemainingBudget(): BigDecimal = totalBudget.subtract(totalSpend)
+    fun providesTicketBonus(): Boolean = bonusTicketsOnCompletion > 0
+
+    fun toDto(): com.gasolinerajsm.adengine.dto.AdvertisementDto {
+        return com.gasolinerajsm.adengine.dto.AdvertisementDto(
+            id = id,
+            campaignId = campaignId,
+            title = title,
+            description = description,
+            adType = adType,
+            status = status,
+            contentUrl = contentUrl,
+            thumbnailUrl = thumbnailUrl,
+            clickThroughUrl = clickThroughUrl,
+            durationSeconds = durationSeconds,
+            startDate = startDate ?: LocalDateTime.now(),
+            endDate = endDate ?: LocalDateTime.now().plusDays(30),
+            priority = priority,
+            dailyBudget = dailyBudget,
+            totalBudget = totalBudget,
+            costPerView = costPerView,
+            costPerClick = costPerClick,
+            maxImpressionsPerUser = maxImpressionsPerUser,
+            maxDailyImpressions = maxDailyImpressions,
+            totalImpressions = totalImpressions.toLong(),
+            totalClicks = totalClicks.toLong(),
+            totalCompletions = totalCompletions.toLong(),
+            totalSpend = totalSpend,
+            ticketMultiplier = ticketMultiplier.toBigDecimal(),
+            bonusTicketsOnCompletion = bonusTicketsOnCompletion,
+            requiresCompletionForBonus = requiresCompletionForBonus,
+            minViewTimeForBonus = minViewTimeForBonus,
+            targetAgeMin = targetAgeMin,
+            targetAgeMax = targetAgeMax,
+            targetGenders = targetGenders.joinToString(","),
+            targetLocations = targetLocations.joinToString(","),
+            targetStations = targetStations.joinToString(","),
+            targetUserSegments = targetUserSegments.joinToString(","),
+            excludeUserSegments = excludeUserSegments.joinToString(","),
+            allowedDaysOfWeek = allowedDaysOfWeek.joinToString(","),
+            allowedHoursStart = allowedHoursStart,
+            allowedHoursEnd = allowedHoursEnd,
+            advertiserName = advertiserName,
+            advertiserContact = advertiserContact,
+            tags = tags.joinToString(","),
+            notes = notes,
+            createdBy = createdBy,
+            updatedBy = updatedBy,
+            createdAt = createdAt,
+            updatedAt = updatedAt,
+            isActiveAndScheduled = isActiveAndScheduled(),
+            hasBudgetRemaining = hasBudgetRemaining(),
+            clickThroughRate = getClickThroughRate(),
+            completionRate = getCompletionRate(),
+            effectiveCPM = getEffectiveCPM(),
+            remainingBudget = getRemainingBudget(),
+            providesTicketBonus = providesTicketBonus()
+        )
+    }
+}

@@ -20,10 +20,18 @@ env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
 
+# Permisos globales para el workflow
+permissions:
+  contents: read
+  security-events: write # Necesario para subir resultados SARIF
+  actions: read
+  id-token: write
+
 jobs:
   # Job 1: Validación de código y tests unitarios
   validate-and-test:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     strategy:
       matrix:
         service:
@@ -86,6 +94,7 @@ jobs:
   # Job 2: Tests de integración e infraestructura
   integration-tests:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     needs: validate-and-test
 
     services:
@@ -195,7 +204,12 @@ jobs:
   # Job 3: Análisis de seguridad
   security-analysis:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     needs: validate-and-test
+    permissions:
+      contents: read
+      security-events: write # Específico para este job
+      actions: read
 
     steps:
       - name: Checkout code
@@ -208,12 +222,15 @@ jobs:
           scan-ref: '.'
           format: 'sarif'
           output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH,MEDIUM'
+          exit-code: '0' # No fallar el build por vulnerabilidades
 
       - name: Upload Trivy scan results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@v2
+        uses: github/codeql-action/upload-sarif@v3
         if: always()
         with:
           sarif_file: 'trivy-results.sarif'
+          category: 'trivy-security-scan'
 
       - name: Run OWASP Dependency Check
         uses: dependency-check/Dependency-Check_Action@main

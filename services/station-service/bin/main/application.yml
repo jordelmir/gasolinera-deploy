@@ -1,0 +1,108 @@
+server:
+  port: 8092
+
+spring:
+  application:
+    name: station-service
+  profiles:
+    active: dev
+  datasource:
+    url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5432}/${POSTGRES_DB:station_db}
+    username: ${POSTGRES_USER:gasolinera_user}
+    password: ${POSTGRES_PASSWORD:gasolinera_pass}
+  jpa:
+    hibernate:
+      ddl-auto: update
+  flyway:
+    enabled: true
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USER:gasolinera_user}
+    password: ${RABBITMQ_PASS:gasolinera_pass}
+    virtual-host: ${RABBITMQ_VHOST:gasolinera_vhost}
+
+---
+spring:
+  config:
+    activate:
+      on-profile: dev
+  datasource:
+    url: jdbc:h2:mem:stationdb
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: true
+  flyway:
+    enabled: false
+  h2:
+    console:
+      enabled: true
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: gasolinera_user
+    password: gasolinera_pass
+    virtual-host: gasolinera_vhost
+
+  cloud:
+    vault:
+      enabled: false  # Disabled for local development
+      scheme: http
+      host: localhost
+      port: 8200
+      authentication: TOKEN
+      token: ${VAULT_TOKEN:myroottoken}
+      kv:
+        enabled: false
+        backend: secret
+        profile-separator: /
+        default-context: application
+        application-name: ${spring.application.name}
+
+# QR Code Signing Configuration
+app:
+  qr:
+    signing:
+      use-generated-keys: true  # Set to false in production
+      private-key-path: "classpath:keys/qr-private-key.pem"
+      public-key-path: "classpath:keys/qr-public-key.pem"
+      key-rotation-enabled: false
+      key-rotation-interval-hours: 168  # 7 days
+  station:
+    default-qr-expiration-hours: 1
+    max-qr-expiration-hours: 24
+    base-redemption-url: "https://gasolinera-jsm.com/redeem"
+
+---
+spring:
+  config:
+    activate:
+      on-profile: dev
+
+app:
+  qr:
+    signing:
+      use-generated-keys: true  # Always use generated keys in dev
+  station:
+    base-redemption-url: "http://localhost:3000/redeem"
+
+---
+spring:
+  config:
+    activate:
+      on-profile: prod
+
+app:
+  qr:
+    signing:
+      use-generated-keys: false  # Use real keys in production
+      private-key-path: "${QR_PRIVATE_KEY_PATH:/vault/secrets/qr-private-key.pem}"
+      public-key-path: "${QR_PUBLIC_KEY_PATH:/vault/secrets/qr-public-key.pem}"
+      key-rotation-enabled: true
+      key-rotation-interval-hours: 168
+  station:
+    base-redemption-url: "${BASE_REDEMPTION_URL:https://gasolinera-jsm.com/redeem}"
