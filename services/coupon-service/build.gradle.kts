@@ -38,8 +38,8 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactor:1.7.3")
 
     // QR Code generation
-    implementation("com.google.zxing:core:3.5.2")
-    implementation("com.google.zxing:javase:3.5.2")
+    implementation("com.google.zxing:core:3.5.3")
+    implementation("com.google.zxing:javase:3.5.3")
 
     // Annotations (for @PostConstruct) - Jakarta EE for Spring Boot 3
     implementation("jakarta.annotation:jakarta.annotation-api")
