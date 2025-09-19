@@ -26,7 +26,7 @@ object MerkleTreeGenerator {
         return currentLevel[0]
     }
 
-    private fun sha256(input: String): String {
+    fun sha256(input: String): String {
         val digest = MessageDigest.getInstance("SHA-256")
         val hash = digest.digest(input.toByteArray(Charsets.UTF_8))
         return hash.joinToString("") { "%02x".format(it) }

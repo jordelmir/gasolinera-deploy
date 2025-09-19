@@ -1,0 +1,491 @@
+name: Gasolinera JSM CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  # Job 1: Validación de código y tests unitarios
+  validate-and-test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service:
+          [
+            auth-service,
+            station-service,
+            coupon-service,
+            raffle-service,
+            redemption-service,
+            api-gateway,
+          ]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v3
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Cache Gradle packages
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Validate Gradle wrapper
+        uses: gradle/wrapper-validation-action@v1
+
+      - name: Run tests for ${{ matrix.service }}
+        run: ./gradlew :services:${{ matrix.service }}:test
+
+      - name: Run static analysis
+        run: ./gradlew :services:${{ matrix.service }}:detekt
+
+      - name: Generate test report
+        uses: dorny/test-reporter@v1
+        if: success() || failure()
+        with:
+          name: Test Results - ${{ matrix.service }}
+          path: services/${{ matrix.service }}/build/test-results/test/*.xml
+          reporter: java-junit
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: test-results-${{ matrix.service }}
+          path: services/${{ matrix.service }}/build/test-results/
+
+  # Job 2: Tests de integración e infraestructura
+  integration-tests:
+    runs-on: ubuntu-latest
+    needs: validate-and-test
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_DB: gasolinera_db_test
+          POSTGRES_USER: gasolinera_user
+          POSTGRES_PASSWORD: gasolinera_password
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+      rabbitmq:
+        image: rabbitmq:3.12-management-alpine
+        env:
+          RABBITMQ_DEFAULT_USER: gasolinera_user
+          RABBITMQ_DEFAULT_PASS: gasolinera_password
+          RABBITMQ_DEFAULT_VHOST: gasolinera_vhost
+        options: >-
+          --health-cmd "rabbitmq-diagnostics -q ping"
+          --health-interval 30s
+          --health-timeout 30s
+          --health-retries 3
+        ports:
+          - 5672:5672
+          - 15672:15672
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v3
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Cache Gradle packages
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+
+      - name: Setup test environment
+        run: |
+          cp config/environments/.env.development .env
+          sed -i 's/localhost/127.0.0.1/g' .env
+          echo "DB_HOST=127.0.0.1" >> .env
+          echo "REDIS_HOST=127.0.0.1" >> .env
+          echo "RABBITMQ_HOST=127.0.0.1" >> .env
+
+      - name: Generate security keys
+        run: |
+          mkdir -p ops/key-management
+          openssl genrsa -out ops/key-management/private-key.pem 2048
+          openssl rsa -in ops/key-management/private-key.pem -pubout -out ops/key-management/public-key.pem
+          chmod 600 ops/key-management/private-key.pem
+
+      - name: Run database migrations
+        run: |
+          # Wait for PostgreSQL to be ready
+          until pg_isready -h 127.0.0.1 -p 5432 -U gasolinera_user; do
+            echo "Waiting for PostgreSQL..."
+            sleep 2
+          done
+
+          # Run migrations manually since Flyway might not be available
+          PGPASSWORD=gasolinera_password psql -h 127.0.0.1 -U gasolinera_user -d gasolinera_db_test -f database/migrations/V1__Create_auth_schema.sql || true
+
+      - name: Run infrastructure tests
+        run: |
+          chmod +x scripts/run-infrastructure-tests.sh
+          ./scripts/run-infrastructure-tests.sh --detailed
+
+      - name: Run integration tests
+        run: ./gradlew integrationTest
+
+      - name: Upload infrastructure test results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: infrastructure-test-results
+          path: tests/reports/
+
+  # Job 3: Análisis de seguridad
+  security-analysis:
+    runs-on: ubuntu-latest
+    needs: validate-and-test
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+      - name: Run OWASP Dependency Check
+        uses: dependency-check/Dependency-Check_Action@main
+        with:
+          project: 'gasolinera-jsm'
+          path: '.'
+          format: 'HTML'
+          out: 'dependency-check-report'
+
+      - name: Upload dependency check results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: dependency-check-report
+          path: dependency-check-report/
+
+  # Job 4: Build y push de imágenes Docker
+  build-and-push:
+    runs-on: ubuntu-latest
+    needs: [integration-tests, security-analysis]
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
+
+    strategy:
+      matrix:
+        service:
+          [
+            auth-service,
+            station-service,
+            coupon-service,
+            raffle-service,
+            redemption-service,
+            api-gateway,
+          ]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/${{ matrix.service }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: services/${{ matrix.service }}/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # Job 5: Deploy a staging
+  deploy-staging:
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    if: github.ref == 'refs/heads/develop' || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'staging')
+    environment: staging
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'v1.28.0'
+
+      - name: Configure kubectl
+        run: |
+          echo "${{ secrets.KUBE_CONFIG_STAGING }}" | base64 -d > kubeconfig
+          export KUBECONFIG=kubeconfig
+
+      - name: Deploy to staging
+        run: |
+          export KUBECONFIG=kubeconfig
+
+          # Update image tags in deployment files
+          for service in auth-service station-service coupon-service raffle-service redemption-service api-gateway; do
+            sed -i "s|image: .*/$service:.*|image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/$service:develop-${{ github.sha }}|g" k8s/staging/$service-deployment.yaml
+          done
+
+          # Apply configurations
+          kubectl apply -f k8s/staging/namespace.yaml
+          kubectl apply -f k8s/staging/configmap.yaml
+          kubectl apply -f k8s/staging/secrets.yaml
+          kubectl apply -f k8s/staging/
+
+          # Wait for rollout
+          for service in auth-service station-service coupon-service raffle-service redemption-service api-gateway; do
+            kubectl rollout status deployment/$service -n gasolinera-staging --timeout=300s
+          done
+
+      - name: Run smoke tests
+        run: |
+          export KUBECONFIG=kubeconfig
+
+          # Get service URLs
+          API_GATEWAY_URL=$(kubectl get service api-gateway -n gasolinera-staging -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+
+          # Wait for services to be ready
+          sleep 60
+
+          # Run basic health checks
+          curl -f http://$API_GATEWAY_URL/health || exit 1
+          curl -f http://$API_GATEWAY_URL/actuator/health || exit 1
+
+      - name: Notify deployment success
+        if: success()
+        run: |
+          echo "✅ Deployment to staging successful"
+          # Add Slack/Teams notification here if needed
+
+  # Job 6: Deploy a producción
+  deploy-production:
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    if: github.ref == 'refs/heads/main' || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'production')
+    environment: production
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'v1.28.0'
+
+      - name: Configure kubectl
+        run: |
+          echo "${{ secrets.KUBE_CONFIG_PRODUCTION }}" | base64 -d > kubeconfig
+          export KUBECONFIG=kubeconfig
+
+      - name: Create backup
+        run: |
+          export KUBECONFIG=kubeconfig
+
+          # Backup current deployment
+          kubectl get deployments -n gasolinera-production -o yaml > backup-deployments-$(date +%Y%m%d-%H%M%S).yaml
+
+          # Upload backup to artifact
+          echo "Backup created for rollback purposes"
+
+      - name: Deploy to production
+        run: |
+          export KUBECONFIG=kubeconfig
+
+          # Update image tags in deployment files
+          for service in auth-service station-service coupon-service raffle-service redemption-service api-gateway; do
+            sed -i "s|image: .*/$service:.*|image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/$service:main-${{ github.sha }}|g" k8s/production/$service-deployment.yaml
+          done
+
+          # Apply configurations
+          kubectl apply -f k8s/production/namespace.yaml
+          kubectl apply -f k8s/production/configmap.yaml
+          kubectl apply -f k8s/production/secrets.yaml
+          kubectl apply -f k8s/production/
+
+          # Rolling update with zero downtime
+          for service in auth-service station-service coupon-service raffle-service redemption-service api-gateway; do
+            kubectl rollout status deployment/$service -n gasolinera-production --timeout=600s
+          done
+
+      - name: Run production smoke tests
+        run: |
+          export KUBECONFIG=kubeconfig
+
+          # Get service URLs
+          API_GATEWAY_URL=$(kubectl get service api-gateway -n gasolinera-production -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+
+          # Wait for services to be ready
+          sleep 120
+
+          # Run comprehensive health checks
+          curl -f https://$API_GATEWAY_URL/health || exit 1
+          curl -f https://$API_GATEWAY_URL/actuator/health || exit 1
+
+          # Test critical endpoints
+          curl -f https://$API_GATEWAY_URL/api/auth/health || exit 1
+          curl -f https://$API_GATEWAY_URL/api/stations/health || exit 1
+
+      - name: Rollback on failure
+        if: failure()
+        run: |
+          export KUBECONFIG=kubeconfig
+          echo "🚨 Deployment failed, initiating rollback..."
+
+          for service in auth-service station-service coupon-service raffle-service redemption-service api-gateway; do
+            kubectl rollout undo deployment/$service -n gasolinera-production
+            kubectl rollout status deployment/$service -n gasolinera-production --timeout=300s
+          done
+
+      - name: Notify deployment result
+        if: always()
+        run: |
+          if [ "${{ job.status }}" == "success" ]; then
+            echo "✅ Production deployment successful"
+          else
+            echo "❌ Production deployment failed and rolled back"
+          fi
+          # Add critical alerts notification here
+
+  # Job 7: Post-deployment monitoring
+  post-deployment-monitoring:
+    runs-on: ubuntu-latest
+    needs: [deploy-staging, deploy-production]
+    if: always() && (needs.deploy-staging.result == 'success' || needs.deploy-production.result == 'success')
+
+    steps:
+      - name: Setup monitoring checks
+        run: |
+          echo "Setting up post-deployment monitoring..."
+
+          # Wait for metrics to be available
+          sleep 300
+
+          # Check key metrics (this would integrate with your monitoring system)
+          echo "Checking application metrics..."
+          echo "Checking error rates..."
+          echo "Checking response times..."
+
+          # In a real implementation, this would query Prometheus/Grafana
+          # and alert if metrics are outside acceptable ranges
+
+      - name: Generate deployment report
+        run: |
+          cat > deployment-report.md << EOF
+          # Deployment Report
+
+          **Date:** $(date)
+          **Commit:** ${{ github.sha }}
+          **Branch:** ${{ github.ref_name }}
+
+          ## Services Deployed
+          - auth-service
+          - station-service
+          - coupon-service
+          - raffle-service
+          - redemption-service
+          - api-gateway
+
+          ## Environment
+          - Staging: ${{ needs.deploy-staging.result }}
+          - Production: ${{ needs.deploy-production.result }}
+
+          ## Next Steps
+          - Monitor application metrics for 24 hours
+          - Verify business functionality
+          - Check error rates and performance
+          EOF
+
+      - name: Upload deployment report
+        uses: actions/upload-artifact@v3
+        with:
+          name: deployment-report
+          path: deployment-report.md

@@ -1,8 +1,7 @@
 plugins {
     kotlin("jvm")
     kotlin("plugin.spring")
-    id("org.springframework.boot")
-    id("io.spring.dependency-management")
+    id("java-library")
 }
 
 repositories {
@@ -10,17 +9,25 @@ repositories {
 }
 
 dependencies {
-    implementation("org.springframework.boot:spring-boot-starter-security")
-    implementation("org.springframework.boot:spring-boot-starter-web")
-    implementation("io.jsonwebtoken:jjwt-api:0.12.3")
-    implementation("io.jsonwebtoken:jjwt-impl:0.12.3")
-    implementation("io.jsonwebtoken:jjwt-jackson:0.12.3")
-    implementation("org.jetbrains.kotlin:kotlin-reflect")
-    implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8")
-    implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
+    api("org.jetbrains.kotlin:kotlin-reflect")
+    api("org.jetbrains.kotlin:kotlin-stdlib-jdk8")
+    api("com.fasterxml.jackson.module:jackson-module-kotlin")
 
-    testImplementation("org.springframework.boot:spring-boot-starter-test")
-    testImplementation("org.springframework.security:spring-security-test")
+    // Spring Security dependencies needed by the security code
+    api("org.springframework:spring-context:6.1.2")
+    api("org.springframework:spring-web:6.1.2")
+    api("org.springframework:spring-webmvc:6.1.2")
+    api("org.springframework.security:spring-security-core:6.2.1")
+    api("org.springframework.security:spring-security-web:6.2.1")
+    api("org.springframework.security:spring-security-config:6.2.1")
+    api("org.springframework.data:spring-data-commons:3.2.1")
+    api("org.springframework.boot:spring-boot:3.2.1")
+    api("org.springframework.boot:spring-boot-autoconfigure:3.2.1")
+    api("jakarta.servlet:jakarta.servlet-api:6.0.0")
+    api("jakarta.validation:jakarta.validation-api:3.0.2")
+    api("org.slf4j:slf4j-api:2.0.9")
+
+    testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
 }
 
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
@@ -34,12 +41,17 @@ tasks.withType<Test> {
     useJUnitPlatform()
 }
 
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+}
+
 // This is a library module, not a standalone application
-tasks.getByName<org.springframework.boot.gradle.tasks.bundling.BootJar>("bootJar") {
+tasks.named<org.springframework.boot.gradle.tasks.bundling.BootJar>("bootJar") {
     enabled = false
 }
 
-tasks.getByName<Jar>("jar") {
+tasks.named<Jar>("jar") {
     enabled = true
     archiveClassifier = ""
 }

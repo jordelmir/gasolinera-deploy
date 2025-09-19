@@ -53,7 +53,7 @@ class RaffleService(
         val existingRaffle = getRaffleById(id)
 
         // Check if raffle can be modified
-        if (!existingRaffle.status.allowsModifications()) {
+        if (!existingRaffle.allowsModifications()) {
             throw IllegalStateException("Raffle in status '${existingRaffle.status}' cannot be modified")
         }
 
@@ -138,7 +138,7 @@ class RaffleService(
             throw IllegalStateException("Raffle must have at least one active prize to be activated")
         }
 
-        val activatedRaffle = raffle.activate(activatedBy)
+        val activatedRaffle = raffle.activate()
         return raffleRepository.save(activatedRaffle)
     }
 
@@ -154,7 +154,7 @@ class RaffleService(
             throw IllegalStateException("Only active raffles can be paused")
         }
 
-        val pausedRaffle = raffle.pause(pausedBy)
+        val pausedRaffle = raffle.pause()
         return raffleRepository.save(pausedRaffle)
     }
 
@@ -166,11 +166,11 @@ class RaffleService(
 
         val raffle = getRaffleById(id)
 
-        if (raffle.status.isFinalState()) {
+        if (raffle.isFinalState()) {
             throw IllegalStateException("Raffle in final state cannot be cancelled")
         }
 
-        val cancelledRaffle = raffle.cancel(cancelledBy)
+        val cancelledRaffle = raffle.cancel()
         return raffleRepository.save(cancelledRaffle)
     }
 
@@ -223,7 +223,7 @@ class RaffleService(
         }
 
         // Complete the raffle
-        val completedRaffle = raffle.complete(executedBy)
+        val completedRaffle = raffle.complete()
         raffleRepository.save(completedRaffle)
 
         logger.info("Draw completed for raffle ID: $raffleId, ${savedWinners.size} winners selected")

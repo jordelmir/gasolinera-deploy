@@ -136,9 +136,11 @@ data class Raffle(
 
     fun isFinalState(): Boolean = status in listOf(RaffleStatus.COMPLETED, RaffleStatus.CANCELLED)
 
-    fun updateParticipantCount(newCount: Int) {
-        currentParticipants = newCount
-        updatedAt = LocalDateTime.now()
+    fun updateParticipantCount(newCount: Int): Raffle {
+        return this.copy(
+            currentParticipants = newCount,
+            updatedAt = LocalDateTime.now()
+        )
     }
 
     // State transition methods

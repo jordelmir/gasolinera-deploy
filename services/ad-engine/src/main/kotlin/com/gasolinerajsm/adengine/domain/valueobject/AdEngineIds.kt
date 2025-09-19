@@ -77,9 +77,16 @@ value class EngagementId(val value: UUID) {
         }
 
         fun from(uuid: UUID): EngagementId = EngagementId(uuid)
+
+        fun fromLong(value: Long): EngagementId {
+            val uuid = UUID(0L, value)
+            return EngagementId(uuid)
+        }
     }
 
     override fun toString(): String = value.toString()
+
+    fun toLong(): Long = value.leastSignificantBits
 }
 
 /**

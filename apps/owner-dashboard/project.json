@@ -5,17 +5,21 @@
   "projectType": "application",
   "targets": {
     "build": {
-      "executor": "@nx/next:build",
+      "executor": "nx:run-commands",
       "outputs": ["{options.outputPath}"],
       "defaultConfiguration": "production",
       "options": {
+        "command": "next build",
         "outputPath": "dist/apps/owner-dashboard"
       },
       "configurations": {
         "development": {
-          "outputPath": "apps/owner-dashboard"
+          "outputPath": "apps/owner-dashboard",
+          "command": "next build"
         },
-        "production": {}
+        "production": {
+          "command": "next build"
+        }
       }
     },
     "serve": {

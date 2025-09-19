@@ -5,23 +5,6 @@ plugins {
     id("io.spring.dependency-management")
     kotlin("jvm")
     kotlin("plugin.spring")
-    id("io.gitlab.arturbosch.detekt")
-}
-
-detekt {
-    toolVersion = "1.23.6"
-    buildUponDefaultConfig = true
-    allRules = false
-    baseline = file("detekt-baseline.xml")
-}
-
-tasks.withType<io.gitlab.arturbosch.detekt.Detekt>().configureEach {
-    reports {
-        xml.required.set(true)
-        html.required.set(true)
-        txt.required.set(false)
-        sarif.required.set(false)
-    }
 }
 
 group = "com.gasolinerajsm"
@@ -38,7 +21,6 @@ repositories {
 }
 
 dependencies {
-    detektPlugins("io.gitlab.arturbosch.detekt:detekt-formatting:1.23.8") // Detekt formatting rules
     // --- Spring Boot Starters ---
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-validation")
@@ -64,6 +46,7 @@ dependencies {
 
     // --- Base de Datos ---
     runtimeOnly("org.postgresql:postgresql")
+    runtimeOnly("com.h2database:h2")
 
     // --- JWT ---
     implementation("io.jsonwebtoken:jjwt-api:0.11.5")
@@ -72,6 +55,17 @@ dependencies {
 
     // --- OpenAPI/Swagger ---
     implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.2.0")
+
+    // --- Jakarta Servlet API ---
+    implementation("jakarta.servlet:jakarta.servlet-api:6.0.0")
+
+    // --- Annotations (for @PostConstruct) - Jakarta EE for Spring Boot 3 ---
+    implementation("jakarta.annotation:jakarta.annotation-api")
+
+    // --- Shared modules ---
+    implementation(project(":shared:common"))
+    implementation(project(":shared:messaging"))
+    implementation(project(":shared:security"))
 
     // --- Tests ---
     testImplementation("org.springframework.boot:spring-boot-starter-test") {
@@ -86,7 +80,7 @@ dependencies {
     // --- Test Containers (for integration tests) ---
     testImplementation("org.testcontainers:junit-jupiter:1.19.7")
     testImplementation("org.testcontainers:postgresql:1.19.7")
-    
+
 
     // --- MockK for Kotlin mocking ---
     testImplementation("io.mockk:mockk:1.13.8")
@@ -94,6 +88,9 @@ dependencies {
 
     // --- AssertJ for better assertions ---
     testImplementation("org.assertj:assertj-core")
+
+    // --- Spring Web for contentType ---
+    testImplementation("org.springframework:spring-web")
 
     // --- JSON testing ---
     testImplementation("com.jayway.jsonpath:json-path")
@@ -105,6 +102,13 @@ dependencies {
 
     // --- JUnit Platform Launcher ---
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+
+    // --- Kotest for testing ---
+    testImplementation("io.kotest:kotest-runner-junit5:5.8.0")
+    testImplementation("io.kotest:kotest-assertions-core:5.8.0")
+
+    // --- Shared testing utilities ---
+    testImplementation(testFixtures(project(":shared:common")))
 }
 
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {

@@ -1,0 +1,128 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "Gasolinera JSM - Business Metrics",
+    "tags": ["gasolinera", "business"],
+    "style": "dark",
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Fuel Transactions",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "increase(gasolinera_fuel_transactions_total[1h])"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "color": { "mode": "palette-classic" }
+          }
+        },
+        "gridPos": { "h": 8, "w": 6, "x": 0, "y": 0 }
+      },
+      {
+        "id": 2,
+        "title": "Coupon Redemptions",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "increase(gasolinera_coupon_redemption_total{success=\"true\"}[1h])"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "color": { "mode": "palette-classic" }
+          }
+        },
+        "gridPos": { "h": 8, "w": 6, "x": 6, "y": 0 }
+      },
+      {
+        "id": 3,
+        "title": "Raffle Participations",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "increase(gasolinera_raffle_participation_total{success=\"true\"}[1h])"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "color": { "mode": "palette-classic" }
+          }
+        },
+        "gridPos": { "h": 8, "w": 6, "x": 12, "y": 0 }
+      },
+      {
+        "id": 4,
+        "title": "QR Generations",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "increase(gasolinera_qr_generation_total{success=\"true\"}[1h])"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "color": { "mode": "palette-classic" }
+          }
+        },
+        "gridPos": { "h": 8, "w": 6, "x": 18, "y": 0 }
+      },
+      {
+        "id": 5,
+        "title": "Fuel Transaction Volume by Type",
+        "type": "piechart",
+        "targets": [
+          {
+            "expr": "sum by (fuel_type) (increase(gasolinera_fuel_transactions_total[1h]))"
+          }
+        ],
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 }
+      },
+      {
+        "id": 6,
+        "title": "Average Transaction Amount",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "gasolinera_fuel_transaction_amount"
+          }
+        ],
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 }
+      },
+      {
+        "id": 7,
+        "title": "Coupon Success Rate",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(gasolinera_coupon_redemption_total{success=\"true\"}[5m]) / rate(gasolinera_coupon_redemption_total[5m]) * 100"
+          }
+        ],
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 }
+      },
+      {
+        "id": 8,
+        "title": "Authentication Events",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(gasolinera_auth_login_total[5m])"
+          }
+        ],
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 }
+      }
+    ],
+    "time": {
+      "from": "now-6h",
+      "to": "now"
+    },
+    "refresh": "1m"
+  }
+}

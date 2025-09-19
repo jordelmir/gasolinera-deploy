@@ -28,6 +28,27 @@ class AuditEventConsumer {
 
             // Process audit event based on type
             when (event.auditType) {
+                AuditType.USER_REGISTRATION,
+                AuditType.USER_LOGIN,
+                AuditType.USER_LOGOUT,
+                AuditType.COUPON_CREATED,
+                AuditType.COUPON_REDEEMED,
+                AuditType.COUPON_VALIDATED,
+                AuditType.RAFFLE_CREATED,
+                AuditType.RAFFLE_ENTRY,
+                AuditType.RAFFLE_DRAW,
+                AuditType.AD_VIEWED,
+                AuditType.AD_CLICKED,
+                AuditType.TICKET_GENERATED,
+                AuditType.TICKET_MULTIPLIED,
+                AuditType.PRIZE_AWARDED,
+                AuditType.SYSTEM_ERROR,
+                AuditType.DATA_EXPORT,
+                AuditType.DATA_IMPORT,
+                AuditType.PAYMENT_PROCESSED -> {
+                    // General audit processing for these types
+                    logger.debug("Processing general audit event: ${event.auditType} - ${event.action}")
+                }
                 AuditType.USER_ACTION -> processUserActionAudit(event)
                 AuditType.SYSTEM_EVENT -> processSystemEventAudit(event)
                 AuditType.TRANSACTION -> processTransactionAudit(event)
@@ -201,6 +222,12 @@ class AuditEventConsumer {
      * Log audit event with appropriate level
      */
     private fun logAuditEvent(event: AuditEvent) {
+        // Validate required fields
+        require(event.eventId.isNotBlank()) { "Event ID cannot be blank" }
+        require(event.action.isNotBlank()) { "Action cannot be blank" }
+        require(event.resource.isNotBlank()) { "Resource cannot be blank" }
+        requireNotNull(event.actionTimestamp) { "Action timestamp cannot be null" }
+
         val logMessage = buildAuditLogMessage(event)
 
         when (event.getAuditLevel()) {
@@ -219,19 +246,26 @@ class AuditEventConsumer {
      * Build structured audit log message
      */
     private fun buildAuditLogMessage(event: AuditEvent): String {
+        // Validate event properties for logging
+        val eventId = event.eventId.takeIf { it.isNotBlank() } ?: "INVALID_EVENT_ID"
+        val action = event.action.takeIf { it.isNotBlank() } ?: "UNKNOWN_ACTION"
+        val resource = event.resource.takeIf { it.isNotBlank() } ?: "UNKNOWN_RESOURCE"
+        val source = event.source.takeIf { it.isNotBlank() } ?: "UNKNOWN_SOURCE"
+        val timestamp = event.actionTimestamp ?: LocalDateTime.now()
+
         return buildString {
             append("AUDIT_EVENT - ")
-            append("EventId: ${event.eventId}, ")
+            append("EventId: $eventId, ")
             append("Type: ${event.auditType}, ")
-            append("Action: ${event.action}, ")
-            append("Resource: ${event.resource}, ")
+            append("Action: $action, ")
+            append("Resource: $resource, ")
             append("ResourceId: ${event.resourceId ?: "N/A"}, ")
             append("User: ${event.userId ?: "SYSTEM"}, ")
             append("Role: ${event.userRole ?: "N/A"}, ")
             append("Station: ${event.stationId ?: "N/A"}, ")
             append("Success: ${event.success}, ")
-            append("Source: ${event.source}, ")
-            append("Timestamp: ${event.actionTimestamp}, ")
+            append("Source: $source, ")
+            append("Timestamp: $timestamp, ")
             append("IP: ${event.ipAddress ?: "N/A"}, ")
             append("UserAgent: ${event.userAgent ?: "N/A"}, ")
             append("CorrelationId: ${event.correlationId ?: "N/A"}, ")

@@ -1,607 +1,196 @@
-# Docker Compose for Optimized Development Environment
-# Includes hot reload, debugging, volume mounting, and development data initialization
-
-version: '3.8'
-
 services:
-  # =============================================================================
-  # INFRASTRUCTURE SERVICES
-  # =============================================================================
-
+  # PostgreSQL Database
   postgres:
     image: postgres:15-alpine
     container_name: gasolinera-postgres-dev
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-gasolinera_jsm_dev}
-      POSTGRES_USER: ${POSTGRES_USER:-gasolinera_dev}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dev_password_2024}
-      POSTGRES_INITDB_ARGS: '--encoding=UTF8 --locale=C'
-      # Development optimizations
-      POSTGRES_SHARED_PRELOAD_LIBRARIES: 'pg_stat_statements'
-      POSTGRES_LOG_STATEMENT: 'all'
-      POSTGRES_LOG_MIN_DURATION_STATEMENT: '100'
+      POSTGRES_DB: gasolinera_dev
+      POSTGRES_USER: gasolinera_user
+      POSTGRES_PASSWORD: gasolinera_pass
+      POSTGRES_MULTIPLE_DATABASES: auth_db,coupon_db,station_db,redemption_db,raffle_db
     ports:
       - '5432:5432'
     volumes:
-      - postgres_dev_data:/var/lib/postgresql/data
-      - ./database/migrations:/docker-entrypoint-initdb.d/migrations
-      - ./scripts/dev-data:/docker-entrypoint-initdb.d/dev-data
-      - ./database/dev-config/postgresql.conf:/etc/postgresql/postgresql.conf
-    command: >
-      postgres
-      -c shared_preload_libraries=pg_stat_statements
-      -c pg_stat_statements.track=all
-      -c log_statement=all
-      -c log_min_duration_statement=100
-      -c max_connections=200
-      -c shared_buffers=256MB
-    healthcheck:
-      test:
-        [
-          'CMD-SHELL',
-          'pg_isready -U ${POSTGRES_USER:-gasolinera_dev} -d ${POSTGRES_DB:-gasolinera_jsm_dev}',
-        ]
-      interval: 5s
-      timeout: 3s
-      retries: 5
-      start_period: 10s
-    restart: unless-stopped
+      - postgres_data:/var/lib/postgresql/data
+      - ./infrastructure/docker/postgres/init-multiple-databases.sh:/docker-entrypoint-initdb.d/init-multiple-databases.sh
     networks:
-      - gasolinera-dev-network
+      - gasolinera-network
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U gasolinera_user -d gasolinera_dev']
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
+  # Redis Cache
   redis:
     image: redis:7-alpine
     container_name: gasolinera-redis-dev
     ports:
       - '6379:6379'
     volumes:
-      - redis_dev_data:/data
-      - ./config/redis/redis-dev.conf:/usr/local/etc/redis/redis.conf
-    command: >
-      redis-server /usr/local/etc/redis/redis.conf
-      --appendonly yes
-      --maxmemory 256mb
-      --maxmemory-policy allkeys-lru
-      --save 60 1000
+      - redis_data:/data
+    networks:
+      - gasolinera-network
     healthcheck:
       test: ['CMD', 'redis-cli', 'ping']
-      interval: 5s
-      timeout: 3s
+      interval: 10s
+      timeout: 5s
       retries: 5
-      start_period: 5s
-    restart: unless-stopped
-    networks:
-      - gasolinera-dev-network
+    command: redis-server --appendonly yes
 
+  # RabbitMQ Message Broker
   rabbitmq:
     image: rabbitmq:3.12-management-alpine
     container_name: gasolinera-rabbitmq-dev
     environment:
-      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USERNAME:-gasolinera_dev}
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-dev_password_2024}
-      RABBITMQ_DEFAULT_VHOST: ${RABBITMQ_VIRTUAL_HOST:-gasolinera_dev_vhost}
-      # Development optimizations
-      RABBITMQ_VM_MEMORY_HIGH_WATERMARK: 0.8
-      RABBITMQ_DISK_FREE_LIMIT: 1GB
+      RABBITMQ_DEFAULT_USER: gasolinera_user
+      RABBITMQ_DEFAULT_PASS: gasolinera_pass
+      RABBITMQ_DEFAULT_VHOST: gasolinera_vhost
     ports:
-      - '5672:5672'
+      - '5672:5672' # AMQP port
       - '15672:15672' # Management UI
     volumes:
-      - rabbitmq_dev_data:/var/lib/rabbitmq
-      - ./config/rabbitmq/dev-definitions.json:/etc/rabbitmq/definitions.json
-      - ./config/rabbitmq/rabbitmq-dev.conf:/etc/rabbitmq/rabbitmq.conf
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - gasolinera-network
     healthcheck:
       test: ['CMD', 'rabbitmq-diagnostics', 'ping']
-      interval: 10s
-      timeout: 5s
+      interval: 30s
+      timeout: 10s
       retries: 5
-      start_period: 20s
-    restart: unless-stopped
-    networks:
-      - gasolinera-dev-network
 
-  jaeger:
-    image: jaegertracing/all-in-one:1.52
-    container_name: gasolinera-jaeger-dev
-    environment:
-      COLLECTOR_OTLP_ENABLED: true
-      SPAN_STORAGE_TYPE: memory
-      MEMORY_MAX_TRACES: 50000
-    ports:
-      - '16686:16686' # Jaeger UI
-      - '14268:14268' # HTTP collector
-      - '4317:4317' # OTLP gRPC
-      - '4318:4318' # OTLP HTTP
-    healthcheck:
-      test:
-        [
-          'CMD',
-          'wget',
-          '--no-verbose',
-          '--tries=1',
-          '--spider',
-          'http://localhost:14269/',
-        ]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-      start_period: 10s
-    restart: unless-stopped
-    networks:
-      - gasolinera-dev-network
-
+  # HashiCorp Vault (Development mode)
   vault:
-    image: hashicorp/vault:1.15.4
+    image: hashicorp/vault:1.15
     container_name: gasolinera-vault-dev
     environment:
-      VAULT_DEV_ROOT_TOKEN_ID: ${VAULT_TOKEN:-dev_vault_token_2024}
-      VAULT_DEV_LISTEN_ADDRESS: '0.0.0.0:8200'
-      VAULT_ADDR: 'http://0.0.0.0:8200'
-      VAULT_LOG_LEVEL: 'debug'
+      VAULT_DEV_ROOT_TOKEN_ID: dev-root-token
+      VAULT_DEV_LISTEN_ADDRESS: 0.0.0.0:8200
     ports:
       - '8200:8200'
     cap_add:
       - IPC_LOCK
-    volumes:
-      - vault_dev_data:/vault/data
-      - ./infrastructure/vault/dev-init.sh:/vault/scripts/dev-init.sh
-      - ./infrastructure/vault/dev-policies:/vault/policies
-    command: >
-      server -dev
-      -dev-root-token-id=${VAULT_TOKEN:-dev_vault_token_2024}
-      -dev-listen-address=0.0.0.0:8200
-      -log-level=debug
+    networks:
+      - gasolinera-network
     healthcheck:
       test: ['CMD', 'vault', 'status']
       interval: 10s
       timeout: 5s
-      retries: 3
-      start_period: 10s
-    restart: unless-stopped
-    networks:
-      - gasolinera-dev-network
+      retries: 5
 
-  # =============================================================================
-  # MICROSERVICES - OPTIMIZED FOR DEVELOPMENT
-  # =============================================================================
-
-  api-gateway:
-    build:
-      context: .
-      dockerfile: services/api-gateway/Dockerfile
-      target: runtime # Use optimized runtime stage
-    container_name: gasolinera-api-gateway-dev
+  # Prometheus (Metrics)
+  prometheus:
+    image: prom/prometheus:v2.45.0
+    container_name: gasolinera-prometheus-dev
     ports:
-      - '8080:8080'
-      - '5005:5005' # Debug port
-    environment:
-      - SPRING_PROFILES_ACTIVE=dev,debug
-      - SPRING_DEVTOOLS_RESTART_ENABLED=true
-      - SPRING_DEVTOOLS_LIVERELOAD_ENABLED=true
-      - VAULT_TOKEN=${VAULT_TOKEN:-dev_vault_token_2024}
-      - VAULT_ADDR=http://vault:8200
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
-      - JAVA_OPTS=-Xmx512m -Xms256m -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005
-      - LOGGING_LEVEL_COM_GASOLINERAJSM=DEBUG
-      - MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=*
+      - '9090:9090'
     volumes:
-      # Hot reload support
-      - ./services/api-gateway/src:/app/src:ro
-      - ./shared:/app/shared:ro
-      - api_gateway_dev_cache:/app/.gradle
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
-      jaeger:
-        condition: service_healthy
-      vault:
-        condition: service_healthy
-      auth-service:
-        condition: service_healthy
-    healthcheck:
-      test: ['CMD', 'curl', '-f', 'http://localhost:8080/actuator/health']
-      interval: 15s
-      timeout: 5s
-      retries: 3
-      start_period: 60s
-    restart: unless-stopped
+      - ./infrastructure/monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
     networks:
-      - gasolinera-dev-network
+      - gasolinera-network
 
-  auth-service:
-    build:
-      context: .
-      dockerfile: services/auth-service/Dockerfile
-      target: runtime
-    container_name: gasolinera-auth-service-dev
+  # Grafana (Dashboards)
+  grafana:
+    image: grafana/grafana:10.1.0
+    container_name: gasolinera-grafana-dev
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: false
     ports:
-      - '8081:8080'
-      - '5006:5005' # Debug port
-    environment:
-      - SPRING_PROFILES_ACTIVE=dev,debug
-      - SPRING_DEVTOOLS_RESTART_ENABLED=true
-      - SPRING_DEVTOOLS_LIVERELOAD_ENABLED=true
-      - VAULT_TOKEN=${VAULT_TOKEN:-dev_vault_token_2024}
-      - VAULT_ADDR=http://vault:8200
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
-      - JAVA_OPTS=-Xmx512m -Xms256m -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005
-      - LOGGING_LEVEL_COM_GASOLINERAJSM=DEBUG
-      - MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=*
+      - '3000:3000'
     volumes:
-      - ./services/auth-service/src:/app/src:ro
-      - ./shared:/app/shared:ro
-      - auth_service_dev_cache:/app/.gradle
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      jaeger:
-        condition: service_healthy
-      vault:
-        condition: service_healthy
-    healthcheck:
-      test: ['CMD', 'curl', '-f', 'http://localhost:8080/actuator/health']
-      interval: 15s
-      timeout: 5s
-      retries: 3
-      start_period: 45s
-    restart: unless-stopped
+      - grafana_data:/var/lib/grafana
+      - ./infrastructure/monitoring/grafana/provisioning:/etc/grafana/provisioning
+      - ./infrastructure/monitoring/grafana/dashboards:/var/lib/grafana/dashboards
     networks:
-      - gasolinera-dev-network
+      - gasolinera-network
+    depends_on:
+      - prometheus
 
-  coupon-service:
-    build:
-      context: .
-      dockerfile: services/coupon-service/Dockerfile
-      target: runtime
-    container_name: gasolinera-coupon-service-dev
+  # Jaeger (Distributed Tracing)
+  jaeger:
+    image: jaegertracing/all-in-one:1.49
+    container_name: gasolinera-jaeger-dev
+    environment:
+      COLLECTOR_OTLP_ENABLED: true
     ports:
-      - '8082:8080'
-      - '5007:5005' # Debug port
-    environment:
-      - SPRING_PROFILES_ACTIVE=dev,debug
-      - SPRING_DEVTOOLS_RESTART_ENABLED=true
-      - SPRING_DEVTOOLS_LIVERELOAD_ENABLED=true
-      - VAULT_TOKEN=${VAULT_TOKEN:-dev_vault_token_2024}
-      - VAULT_ADDR=http://vault:8200
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
-      - JAVA_OPTS=-Xmx512m -Xms256m -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005
-      - LOGGING_LEVEL_COM_GASOLINERAJSM=DEBUG
-      - MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=*
-      - QR_EXPIRATION_MINUTES=15
-    volumes:
-      - ./services/coupon-service/src:/app/src:ro
-      - ./shared:/app/shared:ro
-      - coupon_service_dev_cache:/app/.gradle
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
-      jaeger:
-        condition: service_healthy
-      vault:
-        condition: service_healthy
-    healthcheck:
-      test: ['CMD', 'curl', '-f', 'http://localhost:8080/actuator/health']
-      interval: 15s
-      timeout: 5s
-      retries: 3
-      start_period: 45s
-    restart: unless-stopped
+      - '16686:16686' # Jaeger UI
+      - '14268:14268' # Jaeger collector HTTP
+      - '14250:14250' # Jaeger collector gRPC
+      - '4317:4317' # OTLP gRPC receiver
+      - '4318:4318' # OTLP HTTP receiver
     networks:
-      - gasolinera-dev-network
+      - gasolinera-network
 
-  station-service:
-    build:
-      context: .
-      dockerfile: services/station-service/Dockerfile
-      target: runtime
-    container_name: gasolinera-station-service-dev
+  # Elasticsearch (for ELK stack)
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.9.0
+    container_name: gasolinera-elasticsearch-dev
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - 'ES_JAVA_OPTS=-Xms512m -Xmx512m'
     ports:
-      - '8083:8080'
-      - '5008:5005' # Debug port
-    environment:
-      - SPRING_PROFILES_ACTIVE=dev,debug
-      - SPRING_DEVTOOLS_RESTART_ENABLED=true
-      - SPRING_DEVTOOLS_LIVERELOAD_ENABLED=true
-      - VAULT_TOKEN=${VAULT_TOKEN:-dev_vault_token_2024}
-      - VAULT_ADDR=http://vault:8200
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
-      - JAVA_OPTS=-Xmx512m -Xms256m -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005
-      - LOGGING_LEVEL_COM_GASOLINERAJSM=DEBUG
-      - MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=*
+      - '9200:9200'
     volumes:
-      - ./services/station-service/src:/app/src:ro
-      - ./shared:/app/shared:ro
-      - station_service_dev_cache:/app/.gradle
-    depends_on:
-      postgres:
-        condition: service_healthy
-      jaeger:
-        condition: service_healthy
-      vault:
-        condition: service_healthy
-    healthcheck:
-      test: ['CMD', 'curl', '-f', 'http://localhost:8080/actuator/health']
-      interval: 15s
-      timeout: 5s
-      retries: 3
-      start_period: 45s
-    restart: unless-stopped
+      - elasticsearch_data:/usr/share/elasticsearch/data
     networks:
-      - gasolinera-dev-network
+      - gasolinera-network
 
-  raffle-service:
-    build:
-      context: .
-      dockerfile: services/raffle-service/Dockerfile
-      target: runtime
-    container_name: gasolinera-raffle-service-dev
+  # Kibana (Log visualization)
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.9.0
+    container_name: gasolinera-kibana-dev
+    environment:
+      ELASTICSEARCH_HOSTS: http://elasticsearch:9200
     ports:
-      - '8084:8080'
-      - '5009:5005' # Debug port
-    environment:
-      - SPRING_PROFILES_ACTIVE=dev,debug
-      - SPRING_DEVTOOLS_RESTART_ENABLED=true
-      - SPRING_DEVTOOLS_LIVERELOAD_ENABLED=true
-      - VAULT_TOKEN=${VAULT_TOKEN:-dev_vault_token_2024}
-      - VAULT_ADDR=http://vault:8200
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
-      - JAVA_OPTS=-Xmx512m -Xms256m -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005
-      - LOGGING_LEVEL_COM_GASOLINERAJSM=DEBUG
-      - MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=*
-    volumes:
-      - ./services/raffle-service/src:/app/src:ro
-      - ./shared:/app/shared:ro
-      - raffle_service_dev_cache:/app/.gradle
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
-      jaeger:
-        condition: service_healthy
-      vault:
-        condition: service_healthy
-    healthcheck:
-      test: ['CMD', 'curl', '-f', 'http://localhost:8080/actuator/health']
-      interval: 15s
-      timeout: 5s
-      retries: 3
-      start_period: 45s
-    restart: unless-stopped
+      - '5601:5601'
     networks:
-      - gasolinera-dev-network
+      - gasolinera-network
+    depends_on:
+      - elasticsearch
 
-  redemption-service:
-    build:
-      context: .
-      dockerfile: services/redemption-service/Dockerfile
-      target: runtime
-    container_name: gasolinera-redemption-service-dev
+  # Logstash (Log processing)
+  logstash:
+    image: docker.elastic.co/logstash/logstash:8.9.0
+    container_name: gasolinera-logstash-dev
+    volumes:
+      - ./infrastructure/monitoring/logstash/pipeline:/usr/share/logstash/pipeline
+      - ./infrastructure/monitoring/logstash/config:/usr/share/logstash/config
     ports:
-      - '8085:8080'
-      - '5010:5005' # Debug port
-    environment:
-      - SPRING_PROFILES_ACTIVE=dev,debug
-      - SPRING_DEVTOOLS_RESTART_ENABLED=true
-      - SPRING_DEVTOOLS_LIVERELOAD_ENABLED=true
-      - VAULT_TOKEN=${VAULT_TOKEN:-dev_vault_token_2024}
-      - VAULT_ADDR=http://vault:8200
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
-      - JAVA_OPTS=-Xmx512m -Xms256m -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005
-      - LOGGING_LEVEL_COM_GASOLINERAJSM=DEBUG
-      - MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=*
-    volumes:
-      - ./services/redemption-service/src:/app/src:ro
-      - ./shared:/app/shared:ro
-      - redemption_service_dev_cache:/app/.gradle
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
-      jaeger:
-        condition: service_healthy
-      vault:
-        condition: service_healthy
-    healthcheck:
-      test: ['CMD', 'curl', '-f', 'http://localhost:8080/actuator/health']
-      interval: 15s
-      timeout: 5s
-      retries: 3
-      start_period: 45s
-    restart: unless-stopped
+      - '5044:5044'
+      - '9600:9600'
     networks:
-      - gasolinera-dev-network
-
-  ad-engine:
-    build:
-      context: .
-      dockerfile: services/ad-engine/Dockerfile
-      target: runtime
-    container_name: gasolinera-ad-engine-dev
-    ports:
-      - '8086:8080'
-      - '5011:5005' # Debug port
-    environment:
-      - SPRING_PROFILES_ACTIVE=dev,debug
-      - SPRING_DEVTOOLS_RESTART_ENABLED=true
-      - SPRING_DEVTOOLS_LIVERELOAD_ENABLED=true
-      - VAULT_TOKEN=${VAULT_TOKEN:-dev_vault_token_2024}
-      - VAULT_ADDR=http://vault:8200
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
-      - JAVA_OPTS=-Xmx512m -Xms256m -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005
-      - LOGGING_LEVEL_COM_GASOLINERAJSM=DEBUG
-      - MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=*
-    volumes:
-      - ./services/ad-engine/src:/app/src:ro
-      - ./shared:/app/shared:ro
-      - ad_engine_dev_cache:/app/.gradle
+      - gasolinera-network
     depends_on:
-      postgres:
-        condition: service_healthy
-      jaeger:
-        condition: service_healthy
-      vault:
-        condition: service_healthy
-    healthcheck:
-      test: ['CMD', 'curl', '-f', 'http://localhost:8080/actuator/health']
-      interval: 15s
-      timeout: 5s
-      retries: 3
-      start_period: 45s
-    restart: unless-stopped
-    networks:
-      - gasolinera-dev-network
+      - elasticsearch
 
-  # =============================================================================
-  # DEVELOPMENT TOOLS & UTILITIES
-  # =============================================================================
-
-  # Database administration tool
-  pgadmin:
-    image: dpage/pgadmin4:8.2
-    container_name: gasolinera-pgadmin-dev
-    environment:
-      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-dev@gasolinera.com}
-      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-dev_password_2024}
-      PGADMIN_CONFIG_SERVER_MODE: 'False'
-      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: 'False'
-    ports:
-      - '5050:80'
-    volumes:
-      - pgadmin_dev_data:/var/lib/pgadmin
-      - ./config/pgadmin/servers.json:/pgadmin4/servers.json
-    depends_on:
-      postgres:
-        condition: service_healthy
-    restart: unless-stopped
-    networks:
-      - gasolinera-dev-network
-
-  # Redis administration tool
-  redis-commander:
-    image: rediscommander/redis-commander:latest
-    container_name: gasolinera-redis-commander-dev
-    environment:
-      REDIS_HOSTS: local:redis:6379
-      HTTP_USER: ${REDIS_COMMANDER_USER:-dev}
-      HTTP_PASSWORD: ${REDIS_COMMANDER_PASSWORD:-dev_password_2024}
-    ports:
-      - '8081:8081'
-    depends_on:
-      redis:
-        condition: service_healthy
-    restart: unless-stopped
-    networks:
-      - gasolinera-dev-network
-
-  # Development data seeder
-  dev-data-seeder:
-    build:
-      context: .
-      dockerfile: scripts/dev-seeder/Dockerfile
-    container_name: gasolinera-dev-seeder
-    environment:
-      - POSTGRES_HOST=postgres
-      - POSTGRES_DB=${POSTGRES_DB:-gasolinera_jsm_dev}
-      - POSTGRES_USER=${POSTGRES_USER:-gasolinera_dev}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-dev_password_2024}
-      - REDIS_HOST=redis
-      - SEED_USERS=true
-      - SEED_STATIONS=true
-      - SEED_CAMPAIGNS=true
-      - SEED_COUPONS=true
-      - SEED_RAFFLES=true
-    volumes:
-      - ./scripts/dev-data:/app/data
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      auth-service:
-        condition: service_healthy
-      coupon-service:
-        condition: service_healthy
-    restart: 'no' # Run once
-    networks:
-      - gasolinera-dev-network
-
-# =============================================================================
-# VOLUMES - DEVELOPMENT OPTIMIZED
-# =============================================================================
 volumes:
-  postgres_dev_data:
+  postgres_data:
     driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: ./data/postgres-dev
-  redis_dev_data:
+  redis_data:
     driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: ./data/redis-dev
-  rabbitmq_dev_data:
+  rabbitmq_data:
     driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: ./data/rabbitmq-dev
-  vault_dev_data:
+  prometheus_data:
     driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: ./data/vault-dev
-  pgadmin_dev_data:
+  grafana_data:
     driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: ./data/pgadmin-dev
-
-  # Service-specific cache volumes for faster rebuilds
-  api_gateway_dev_cache:
-    driver: local
-  auth_service_dev_cache:
-    driver: local
-  coupon_service_dev_cache:
-    driver: local
-  station_service_dev_cache:
-    driver: local
-  raffle_service_dev_cache:
-    driver: local
-  redemption_service_dev_cache:
-    driver: local
-  ad_engine_dev_cache:
+  elasticsearch_data:
     driver: local
 
-# =============================================================================
-# NETWORKS - DEVELOPMENT OPTIMIZED
-# =============================================================================
 networks:
-  gasolinera-dev-network:
+  gasolinera-network:
     driver: bridge
     ipam:
       config:
-        - subnet: 172.21.0.0/16
-          gateway: 172.21.0.1
-    driver_opts:
-      com.docker.network.bridge.name: gasolinera-dev-br0
-      com.docker.network.driver.mtu: 1500
+        - subnet: 172.25.0.0/16

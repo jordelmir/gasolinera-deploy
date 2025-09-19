@@ -201,7 +201,7 @@ class RaffleEntryService(
         )
 
         val savedTicket = raffleTicketRepository.save(cancelledTicket)
-        updateRaffleParticipantCount(ticket.raffle.id)
+        updateRaffleParticipantCount(ticket.raffle.id!!)
 
         return savedTicket
     }
@@ -243,7 +243,7 @@ class RaffleEntryService(
 
             raffle.isRegistrationOpen() &&
             raffle.canAcceptMoreParticipants() &&
-            raffle.canUserParticipate(totalTickets) &&
+            raffle.canUserParticipate(totalTickets.toInt()) &&
             totalTickets >= raffle.minTicketsToParticipate
         } catch (e: Exception) {
             logger.debug("User $userId cannot enter raffle $raffleId: ${e.message}")
@@ -277,7 +277,7 @@ class RaffleEntryService(
         val currentUserTickets = getUserActiveTicketCount(userId, raffleId)
         val totalUserTickets = currentUserTickets + ticketCount
 
-        if (!raffle.canUserParticipate(totalUserTickets)) {
+        if (!raffle.canUserParticipate(totalUserTickets.toInt())) {
             throw IllegalStateException("User ticket count would exceed raffle limits")
         }
 
@@ -336,7 +336,7 @@ class RaffleEntryService(
             RaffleTicket(
                 userId = userId,
                 raffle = raffle,
-                ticketNumber = generateTicketNumber(raffle.id, userId),
+                ticketNumber = generateTicketNumber(raffle.id!!, userId),
                 status = TicketStatus.ACTIVE,
                 sourceType = TicketSourceType.COUPON_REDEMPTION,
                 sourceReference = couponId.toString(),
@@ -366,7 +366,7 @@ class RaffleEntryService(
             RaffleTicket(
                 userId = userId,
                 raffle = raffle,
-                ticketNumber = generateTicketNumber(raffle.id, userId),
+                ticketNumber = generateTicketNumber(raffle.id!!, userId),
                 status = TicketStatus.ACTIVE,
                 sourceType = TicketSourceType.DIRECT_PURCHASE,
                 sourceReference = transactionReference,
@@ -393,7 +393,7 @@ class RaffleEntryService(
             RaffleTicket(
                 userId = userId,
                 raffle = raffle,
-                ticketNumber = generateTicketNumber(raffle.id, userId),
+                ticketNumber = generateTicketNumber(raffle.id!!, userId),
                 status = TicketStatus.ACTIVE,
                 sourceType = TicketSourceType.PROMOTIONAL,
                 sourceReference = sourceReference,

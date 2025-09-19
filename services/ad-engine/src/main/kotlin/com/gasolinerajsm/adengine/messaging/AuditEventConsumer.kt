@@ -1,6 +1,7 @@
 package com.gasolinerajsm.adengine.messaging
 
 import com.gasolinerajsm.messaging.events.AuditEvent
+import com.gasolinerajsm.messaging.events.AuditLevel
 import com.gasolinerajsm.messaging.events.AuditType
 import org.slf4j.LoggerFactory
 import org.springframework.amqp.rabbit.annotation.RabbitListener
@@ -106,11 +107,11 @@ class AuditEventConsumer {
         val logMessage = buildAuditLogMessage(event)
 
         when (event.getAuditLevel()) {
-            com.gasolinerajsm.messaging.events.AuditLevel.DEBUG -> auditLogger.debug(logMessage)
-            com.gasolinerajsm.messaging.events.AuditLevel.INFO -> auditLogger.info(logMessage)
-            com.gasolinerajsm.messaging.events.AuditLevel.WARN -> auditLogger.warn(logMessage)
-            com.gasolinerajsm.messaging.events.AuditLevel.ERROR -> auditLogger.error(logMessage)
-            com.gasolinerajsm.messaging.events.AuditLevel.CRITICAL -> {
+            AuditLevel.DEBUG -> auditLogger.debug(logMessage)
+            AuditLevel.INFO -> auditLogger.info(logMessage)
+            AuditLevel.WARN -> auditLogger.warn(logMessage)
+            AuditLevel.ERROR -> auditLogger.error(logMessage)
+            AuditLevel.CRITICAL -> {
                 auditLogger.error("CRITICAL: $logMessage")
                 logger.error("CRITICAL_AD_ENGINE_AUDIT: $logMessage")
             }

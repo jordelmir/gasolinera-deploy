@@ -4,39 +4,82 @@ server:
 spring:
   application:
     name: auth-service
+  profiles:
+    active: dev
   datasource:
-    url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5432}/${POSTGRES_DB:puntog}
-    username: ${POSTGRES_USER:puntog}
-    password: ${POSTGRES_PASSWORD:changeme}
+    url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5432}/${POSTGRES_DB:auth_db}
+    username: ${POSTGRES_USER:gasolinera_user}
+    password: ${POSTGRES_PASSWORD:gasolinera_pass}
   jpa:
     hibernate:
-      ddl-auto: validate
+      ddl-auto: update
+    properties:
+      hibernate:
+        default_schema: auth_schema
   flyway:
     enabled: true
+    schemas: auth_schema
   redis:
     host: ${REDIS_HOST:localhost}
 
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USER:gasolinera_user}
+    password: ${RABBITMQ_PASS:gasolinera_pass}
+    virtual-host: ${RABBITMQ_VHOST:gasolinera_vhost}
+
+---
+spring:
+  config:
+    activate:
+      on-profile: dev
+  datasource:
+    url: jdbc:h2:mem:testdb
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    properties:
+      hibernate:
+        default_schema:
+    show-sql: true
+  flyway:
+    enabled: false
+  h2:
+    console:
+      enabled: true
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: gasolinera_user
+    password: gasolinera_pass
+    virtual-host: gasolinera_vhost
+
   cloud:
     vault:
-      enabled: true
+      enabled: false  # Disabled for local development
       scheme: http
       host: localhost
       port: 8200
       authentication: TOKEN
       token: ${VAULT_TOKEN:myroottoken} # For local development
       kv:
-        enabled: true
+        enabled: false
         backend: secret # Or your backend name
         profile-separator: /
         default-context: application
         application-name: ${spring.application.name}
 
+jwt:
+  secretKey: ${JWT_SECRET:mySuperSecretKeyForJWTThatIsAtLeast32CharactersLongForDevelopment}
+  refreshSecretKey: ${JWT_REFRESH_SECRET:mySuperSecretRefreshKeyForJWTThatIsAtLeast32CharactersLongForDevelopment}
+  accessTokenExpiration: 900 # 15 minutes
+  refreshTokenExpiration: 604800 # 7 days
+
 app:
-  jwt:
-    secret: ${JWT_SECRET}
-    refreshSecret: ${JWT_REFRESH_SECRET}
-    expirationMs: 900000 # 15 minutes
-    refreshExpirationMs: 604800000 # 7 days
   otp:
     provider: ${OTP_PROVIDER:mock}
     length: 6
@@ -48,5 +91,10 @@ app:
     advertiser-password: ${ADVERTISER_PASSWORD:tosty123}
 
 # --- OpenTelemetry Tracing Configuration ---
-management.tracing.sampling.probability=1.0
-management.otlp.tracing.endpoint=http://jaeger:4318/v1/traces
+management:
+  tracing:
+    sampling:
+      probability: 1.0
+  otlp:
+    tracing:
+      endpoint: http://jaeger:4318/v1/traces

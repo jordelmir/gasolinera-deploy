@@ -1,455 +1,233 @@
 package com.gasolinerajsm.adengine.service
 
-import com.gasolinerajsm.adengine.model.*
-import com.gasolinerajsm.adengine.repository.*
-import org.slf4j.LoggerFactory
+import com.gasolinerajsm.adengine.domain.model.AdEngagement
+import com.gasolinerajsm.adengine.domain.model.EngagementStatus
+import com.gasolinerajsm.adengine.domain.model.EngagementType
+import com.gasolinerajsm.adengine.domain.valueobject.*
+import com.gasolinerajsm.adengine.dto.*
 import org.springframework.data.domain.Page
+import org.springframework.data.domain.PageImpl
+import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Pageable
 import org.springframework.stereotype.Service
-import org.springframework.transaction.annotation.Transactional
 import java.math.BigDecimal
 import java.time.LocalDateTime
+import java.util.*
 
-/**
- * Service for tracking advertisement engagement and completion monitoring
- */
 @Service
-@Transactional
-class EngagementTrackingService(
-    private val adEngagementRepository: AdEngagementRepository,
-    private val advertisementRepository: AdvertisementRepository
-) {
-    private val logger = LoggerFactory.getLogger(EngagementTrackingService::class.java)
+class EngagementTrackingService {
 
-    /**
-     * Create an impression engagement
-     */
-    fun createImpression(
-        userId: Long,
-        advertisement: Advertisement,
-        sessionId: String? = null,
-        stationId: Long? = null,
-        deviceType: String? = null,
-        deviceId: String? = null,
-        ipAddress: String? = null,
-        userAgent: String? = null,
-        placementContext: String? = null,
-        locationLatitude: BigDecimal? = null,
-        locationLongitude: BigDecimal? = null
-    ): AdEngagement {
-        logger.debug("Creating impression engagement for user $userId, ad ${advertisement.id}")
+    // In-memory storage for demo purposes - in real implementation, this would be a repository
+    private val engagements = mutableMapOf<EngagementId, AdEngagement>()
 
-        val engagement = AdEngagement(
-            userId = userId,
-            advertisement = advertisement,
-            sessionId = sessionId,
-            engagementType = EngagementType.IMPRESSION,
-            status = EngagementStatus.STARTED,
-            startedAt = LocalDateTime.now(),
-            stationId = stationId,
-            deviceType = deviceType,
-            deviceId = deviceId,
-            ipAddress = ipAddress,
-            userAgent = userAgent,
-            placementContext = placementContext,
-            locationLatitude = locationLatitude,
-            locationLongitude = locationLongitude
-        )
-
-        val savedEngagement = adEngagementRepository.save(engagement)
-
-        // Update advertisement statistics
-        updateAdvertisementStatistics(advertisement.id, impressions = 1)
-
-        logger.info("Created impression engagement ${savedEngagement.id} for user $userId")
-        return savedEngagement
-    }
-
-    /**
-     * Track advertisement view
-     */
     fun trackView(
-        engagementId: Long,
-        viewDurationSeconds: Int? = null
+        engagementId: EngagementId,
+        viewDurationSeconds: Int?
     ): AdEngagement {
-        logger.debug("Tracking view for engagement $engagementId")
-
-        val engagement = getEngagementById(engagementId)
-
+        val engagement = engagements[engagementId] ?: throw NoSuchElementException("Engagement not found")
         val updatedEngagement = engagement.copy(
-            engagementType = EngagementType.VIEW,
+            interactionData = engagement.interactionData.copy(
+                viewDurationSeconds = viewDurationSeconds
+            ),
             status = EngagementStatus.VIEWED,
-            viewDurationSeconds = viewDurationSeconds
+            updatedAt = LocalDateTime.now()
         )
-
-        return adEngagementRepository.save(updatedEngagement)
+        engagements[engagementId] = updatedEngagement
+        return updatedEngagement
     }
 
-    /**
-     * Track advertisement click
-     */
     fun trackClick(
-        engagementId: Long,
-        clickThroughUrl: String? = null
+        engagementId: EngagementId,
+        clickThroughUrl: String?
     ): AdEngagement {
-        logger.debug("Tracking click for engagement $engagementId")
-
-        val engagement = getEngagementById(engagementId)
-
-        val updatedEngagement = engagement.click(clickThroughUrl)
-
-        val savedEngagement = adEngagementRepository.save(updatedEngagement)
-
-        // Update advertisement statistics
-        updateAdvertisementStatistics(engagement.advertisement.id, clicks = 1)
-
-        logger.info("Tracked click for engagement $engagementId")
-        return savedEngagement
-    }
-
-    /**
-     * Track advertisement interaction
-     */
-    fun trackInteraction(
-        engagementId: Long,
-        interactionType: String? = null
-    ): AdEngagement {
-        logger.debug("Tracking interaction for engagement $engagementId")
-
-        val engagement = getEngagementById(engagementId)
-
+        val engagement = engagements[engagementId] ?: throw NoSuchElementException("Engagement not found")
         val updatedEngagement = engagement.copy(
-            engagementType = EngagementType.INTERACTION,
+            interactionData = engagement.interactionData.recordClick(clickThroughUrl),
             status = EngagementStatus.INTERACTED,
-            interactionsCount = engagement.interactionsCount + 1,
-            metadata = interactionType?.let { "${engagement.metadata ?: ""}|interaction:$it" } ?: engagement.metadata
+            updatedAt = LocalDateTime.now()
         )
-
-        return adEngagementRepository.save(updatedEngagement)
+        engagements[engagementId] = updatedEngagement
+        return updatedEngagement
     }
 
-    /**
-     * Track advertisement completion
-     */
-    fun trackCompletion(
-        engagementId: Long,
-        completionPercentage: BigDecimal? = null,
-        viewDurationSeconds: Int? = null
+    fun trackInteraction(
+        engagementId: EngagementId,
+        interactionType: String
     ): AdEngagement {
-        logger.debug("Tracking completion for engagement $engagementId")
-
-        val engagement = getEngagementById(engagementId)
-
-        val updatedEngagement = engagement.complete(completionPercentage, viewDurationSeconds)
-
-        val savedEngagement = adEngagementRepository.save(updatedEngagement)
-
-        // Update advertisement statistics
-        updateAdvertisementStatistics(engagement.advertisement.id, completions = 1)
-
-        logger.info("Tracked completion for engagement $engagementId")
-        return savedEngagement
-    }
-
-    /**
-     * Track advertisement skip
-     */
-    fun trackSkip(engagementId: Long): AdEngagement {
-        logger.debug("Tracking skip for engagement $engagementId")
-
-        val engagement = getEngagementById(engagementId)
-
-        val updatedEngagement = engagement.skip()
-
-        return adEngagementRepository.save(updatedEngagement)
-    }
-
-    /**
-     * Track engagement error
-     */
-    fun trackError(
-        engagementId: Long,
-        errorMessage: String,
-        errorCode: String? = null
-    ): AdEngagement {
-        logger.debug("Tracking error for engagement $engagementId: $errorMessage")
-
-        val engagement = getEngagementById(engagementId)
-
-        val updatedEngagement = engagement.error(errorMessage, errorCode)
-
-        return adEngagementRepository.save(updatedEngagement)
-    }
-
-    /**
-     * Update engagement progress
-     */
-    fun updateEngagementProgress(
-        engagementId: Long,
-        viewDurationSeconds: Int,
-        completionPercentage: BigDecimal? = null,
-        interactions: Int = 0,
-        pauses: Int = 0,
-        replays: Int = 0
-    ): AdEngagement {
-        logger.debug("Updating progress for engagement $engagementId")
-
-        val engagement = getEngagementById(engagementId)
-
+        val engagement = engagements[engagementId] ?: throw NoSuchElementException("Engagement not found")
         val updatedEngagement = engagement.copy(
-            viewDurationSeconds = viewDurationSeconds,
-            completionPercentage = completionPercentage,
-            interactionsCount = engagement.interactionsCount + interactions,
-            pauseCount = engagement.pauseCount + pauses,
-            replayCount = engagement.replayCount + replays
+            interactionData = engagement.interactionData.copy(
+                interactionsCount = engagement.interactionData.interactionsCount + 1
+            ),
+            status = EngagementStatus.INTERACTED,
+            updatedAt = LocalDateTime.now()
         )
-
-        return adEngagementRepository.save(updatedEngagement)
+        engagements[engagementId] = updatedEngagement
+        return updatedEngagement
     }
 
-    /**
-     * Award tickets for engagement
-     */
+    fun trackCompletion(
+        engagementId: EngagementId,
+        completionPercentage: BigDecimal?,
+        viewDurationSeconds: Int?
+    ): AdEngagement {
+        val engagement = engagements[engagementId] ?: throw NoSuchElementException("Engagement not found")
+        val updatedEngagement = engagement.complete(completionPercentage, viewDurationSeconds)
+        engagements[engagementId] = updatedEngagement
+        return updatedEngagement
+    }
+
+    fun updateEngagementProgress(
+        engagementId: EngagementId,
+        viewDurationSeconds: Int,
+        completionPercentage: BigDecimal?,
+        interactions: Int,
+        pauses: Int,
+        replays: Int
+    ): AdEngagement {
+        val engagement = engagements[engagementId] ?: throw NoSuchElementException("Engagement not found")
+        val updatedEngagement = engagement.copy(
+            interactionData = engagement.interactionData.copy(
+                viewDurationSeconds = viewDurationSeconds,
+                completionPercentage = completionPercentage,
+                interactionsCount = engagement.interactionData.interactionsCount + interactions,
+                pauseCount = engagement.interactionData.pauseCount + pauses,
+                replayCount = engagement.interactionData.replayCount + replays
+            ),
+            updatedAt = LocalDateTime.now()
+        )
+        engagements[engagementId] = updatedEngagement
+        return updatedEngagement
+    }
+
+    fun trackSkip(engagementId: EngagementId): AdEngagement {
+        val engagement = engagements[engagementId] ?: throw NoSuchElementException("Engagement not found")
+        val updatedEngagement = engagement.skip()
+        engagements[engagementId] = updatedEngagement
+        return updatedEngagement
+    }
+
+    fun trackError(
+        engagementId: EngagementId,
+        errorMessage: String,
+        errorCode: String?
+    ): AdEngagement {
+        val engagement = engagements[engagementId] ?: throw NoSuchElementException("Engagement not found")
+        val updatedEngagement = engagement.error(errorMessage, errorCode)
+        engagements[engagementId] = updatedEngagement
+        return updatedEngagement
+    }
+
     fun awardTickets(
-        engagementId: Long,
+        engagementId: EngagementId,
         baseTickets: Int,
         bonusTickets: Int,
-        raffleEntryId: Long? = null
+        raffleEntryId: RaffleEntryId?
     ): AdEngagement {
-        logger.info("Awarding tickets for engagement $engagementId: base=$baseTickets, bonus=$bonusTickets")
-
-        val engagement = getEngagementById(engagementId)
-
-        if (!engagement.qualifiesForRewards()) {
-            throw IllegalStateException("Engagement does not qualify for rewards")
-        }
-
-        if (engagement.hasTicketsAwarded()) {
-            throw IllegalStateException("Tickets have already been awarded for this engagement")
-        }
-
+        val engagement = engagements[engagementId] ?: throw NoSuchElementException("Engagement not found")
         val updatedEngagement = engagement.awardTickets(baseTickets, bonusTickets, raffleEntryId)
-
-        return adEngagementRepository.save(updatedEngagement)
+        engagements[engagementId] = updatedEngagement
+        return updatedEngagement
     }
 
-    /**
-     * Get engagement by ID
-     */
-    @Transactional(readOnly = true)
     fun getEngagementById(id: Long): AdEngagement {
-        return adEngagementRepository.findById(id)
-            .orElseThrow { NoSuchElementException("Engagement not found with ID: $id") }
+        val engagementId = EngagementId.fromLong(id)
+        return engagements[engagementId] ?: throw NoSuchElementException("Engagement not found")
     }
 
-    /**
-     * Get user engagements
-     */
-    @Transactional(readOnly = true)
     fun getUserEngagements(userId: Long, pageable: Pageable): Page<AdEngagement> {
-        return adEngagementRepository.findByUserId(userId, pageable)
+        val userEngagements = engagements.values
+            .filter { it.userId.toLong() == userId }
+            .sortedByDescending { it.createdAt }
+
+        val start = pageable.pageNumber * pageable.pageSize
+        val end = minOf(start + pageable.pageSize, userEngagements.size)
+        val pageContent = if (start < userEngagements.size) userEngagements.subList(start, end) else emptyList()
+
+        return PageImpl(pageContent, pageable, userEngagements.size.toLong())
     }
 
-    /**
-     * Get advertisement engagements
-     */
-    @Transactional(readOnly = true)
     fun getAdvertisementEngagements(advertisementId: Long, pageable: Pageable): Page<AdEngagement> {
-        return adEngagementRepository.findByAdvertisementId(advertisementId, pageable)
+        val adEngagements = engagements.values
+            .filter { it.advertisementId.toLong() == advertisementId }
+            .sortedByDescending { it.createdAt }
+
+        val start = pageable.pageNumber * pageable.pageSize
+        val end = minOf(start + pageable.pageSize, adEngagements.size)
+        val pageContent = if (start < adEngagements.size) adEngagements.subList(start, end) else emptyList()
+
+        return PageImpl(pageContent, pageable, adEngagements.size.toLong())
     }
 
-    /**
-     * Get engagements pending ticket award
-     */
-    @Transactional(readOnly = true)
-    fun getEngagementsPendingTicketAward(): List<AdEngagement> {
-        return adEngagementRepository.findEngagementsPendingTicketAward()
-    }
-
-    /**
-     * Get user engagement statistics
-     */
-    @Transactional(readOnly = true)
     fun getUserEngagementStatistics(userId: Long): Map<String, Any> {
-        return adEngagementRepository.getUserEngagementStatistics(userId)
+        val userEngagements = engagements.values.filter { it.userId.toLong() == userId }
+
+        return mapOf(
+            "totalEngagements" to userEngagements.size.toLong(),
+            "completedEngagements" to userEngagements.count { it.isCompleted() }.toLong(),
+            "clickedEngagements" to userEngagements.count { it.interactionData.clicked }.toLong(),
+            "totalTicketsEarned" to userEngagements.sumOf { it.rewardData.totalTicketsEarned }.toLong(),
+            "uniqueAdsEngaged" to userEngagements.map { it.advertisementId }.distinct().size.toLong(),
+            "avgViewDuration" to if (userEngagements.isNotEmpty()) {
+                userEngagements.mapNotNull { it.interactionData.viewDurationSeconds }.average()
+            } else 0.0
+        )
     }
 
-    /**
-     * Get advertisement engagement statistics
-     */
-    @Transactional(readOnly = true)
-    fun getAdvertisementEngagementStatistics(advertisementId: Long): Map<String, Any> {
-        return adEngagementRepository.getEngagementStatisticsByAdvertisement(advertisementId)
-    }
-
-    /**
-     * Get daily engagement statistics
-     */
-    @Transactional(readOnly = true)
     fun getDailyEngagementStatistics(): Map<String, Any> {
-        val startOfDay = LocalDateTime.now().toLocalDate().atStartOfDay()
-        return adEngagementRepository.getDailyEngagementStatistics(startOfDay)
+        val today = LocalDateTime.now().toLocalDate()
+        val todayEngagements = engagements.values.filter {
+            it.createdAt.toLocalDate() == today
+        }
+
+        return mapOf(
+            "totalEngagements" to todayEngagements.size.toLong(),
+            "impressions" to todayEngagements.size.toLong(),
+            "clicks" to todayEngagements.count { it.interactionData.clicked }.toLong(),
+            "completions" to todayEngagements.count { it.isCompleted() }.toLong(),
+            "uniqueUsers" to todayEngagements.map { it.userId }.distinct().size.toLong(),
+            "totalTicketsEarned" to todayEngagements.sumOf { it.rewardData.totalTicketsEarned }.toLong(),
+            "totalCost" to BigDecimal.ZERO // Simplified
+        )
     }
 
-    /**
-     * Calculate engagement quality score
-     */
-    @Transactional(readOnly = true)
-    fun calculateEngagementQuality(engagementId: Long): Double {
-        val engagement = getEngagementById(engagementId)
-        return engagement.getEngagementQualityScore()
-    }
-
-    /**
-     * Get high-performing engagements
-     */
-    @Transactional(readOnly = true)
-    fun getHighPerformingEngagements(
-        minCompletionPercentage: BigDecimal = BigDecimal("80.0"),
-        minViewDuration: Int = 30
-    ): List<AdEngagement> {
-        return adEngagementRepository.findHighPerformingEngagements(minCompletionPercentage, minViewDuration)
-    }
-
-    /**
-     * Get engagement conversion funnel
-     */
-    @Transactional(readOnly = true)
     fun getEngagementFunnel(
         advertisementId: Long,
         startDate: LocalDateTime,
         endDate: LocalDateTime
     ): Map<String, Any> {
-        return adEngagementRepository.getEngagementFunnel(advertisementId, startDate, endDate)
-    }
-
-    /**
-     * Process abandoned engagements
-     */
-    fun processAbandonedEngagements(timeoutMinutes: Long = 30): List<AdEngagement> {
-        logger.info("Processing abandoned engagements older than $timeoutMinutes minutes")
-
-        val cutoffTime = LocalDateTime.now().minusMinutes(timeoutMinutes)
-        val abandonedEngagements = adEngagementRepository.findAbandonedEngagements(cutoffTime)
-
-        val processedEngagements = abandonedEngagements.map { engagement ->
-            val updatedEngagement = engagement.copy(status = EngagementStatus.ABANDONED)
-            adEngagementRepository.save(updatedEngagement)
+        val adEngagements = engagements.values.filter {
+            it.advertisementId.toLong() == advertisementId &&
+            it.createdAt.isAfter(startDate) &&
+            it.createdAt.isBefore(endDate)
         }
 
-        logger.info("Processed ${processedEngagements.size} abandoned engagements")
-        return processedEngagements
-    }
+        val impressions = adEngagements.size.toLong()
+        val views = adEngagements.count { it.status != EngagementStatus.STARTED }.toLong()
+        val clicks = adEngagements.count { it.interactionData.clicked }.toLong()
+        val completions = adEngagements.count { it.isCompleted() }.toLong()
 
-    /**
-     * Get hourly engagement distribution
-     */
-    @Transactional(readOnly = true)
-    fun getHourlyEngagementDistribution(days: Long = 7): Map<Int, Long> {
-        val startDate = LocalDateTime.now().minusDays(days)
-        val distribution = adEngagementRepository.getHourlyEngagementDistribution(startDate)
-
-        return distribution.associate {
-            (it[0] as Number).toInt() to (it[1] as Number).toLong()
-        }
-    }
-
-    /**
-     * Validate engagement completion requirements
-     */
-    fun validateCompletionRequirements(
-        engagementId: Long,
-        advertisement: Advertisement
-    ): Boolean {
-        val engagement = getEngagementById(engagementId)
-
-        // Check minimum view time
-        advertisement.minViewTimeForBonus?.let { minTime ->
-            if (engagement.viewDurationSeconds == null || engagement.viewDurationSeconds < minTime) {
-                return false
-            }
-        }
-
-        // Check completion percentage
-        if (advertisement.requiresCompletionForBonus) {
-            if (!engagement.isCompleted()) {
-                return false
-            }
-        }
-
-        return true
-    }
-
-    /**
-     * Calculate ticket rewards for engagement
-     */
-    fun calculateTicketRewards(
-        engagementId: Long,
-        baseTickets: Int
-    ): Pair<Int, Int> { // Returns (baseTickets, bonusTickets)
-        val engagement = getEngagementById(engagementId)
-        val advertisement = engagement.advertisement
-
-        if (!validateCompletionRequirements(engagementId, advertisement)) {
-            return Pair(0, 0)
-        }
-
-        val bonusTickets = advertisement.calculateBonusTickets(
-            baseTickets = baseTickets,
-            wasCompleted = engagement.isCompleted(),
-            viewTimeSeconds = engagement.viewDurationSeconds
+        return mapOf(
+            "impressions" to impressions,
+            "views" to views,
+            "clicks" to clicks,
+            "completions" to completions
         )
-
-        return Pair(baseTickets, bonusTickets)
     }
 
-    /**
-     * Update advertisement statistics
-     */
-    private fun updateAdvertisementStatistics(
-        advertisementId: Long,
-        impressions: Long = 0,
-        clicks: Long = 0,
-        completions: Long = 0,
-        spend: BigDecimal = BigDecimal.ZERO
-    ) {
-        advertisementRepository.updateStatistics(advertisementId, impressions, clicks, completions, spend)
-    }
-
-    /**
-     * Set billing information for engagement
-     */
-    fun setBillingInfo(
-        engagementId: Long,
-        cost: BigDecimal,
-        billingEvent: String
+    // Helper method to create test engagements
+    fun createTestEngagement(
+        userId: UserId,
+        advertisementId: AdvertisementId,
+        engagementType: EngagementType = EngagementType.VIEW
     ): AdEngagement {
-        logger.debug("Setting billing info for engagement $engagementId: $cost for $billingEvent")
-
-        val engagement = getEngagementById(engagementId)
-
-        val updatedEngagement = engagement.setBilling(cost, billingEvent)
-        val savedEngagement = adEngagementRepository.save(updatedEngagement)
-
-        // Update advertisement spend
-        updateAdvertisementStatistics(engagement.advertisement.id, spend = cost)
-
-        return savedEngagement
-    }
-
-    /**
-     * Get engagements by session
-     */
-    @Transactional(readOnly = true)
-    fun getEngagementsBySession(sessionId: String): List<AdEngagement> {
-        return adEngagementRepository.findBySessionId(sessionId)
-    }
-
-    /**
-     * Get recent user engagements
-     */
-    @Transactional(readOnly = true)
-    fun getRecentUserEngagements(userId: Long, pageable: Pageable): Page<AdEngagement> {
-        return adEngagementRepository.findRecentEngagementsByUser(userId, pageable)
+        val engagement = AdEngagement.start(
+            userId = userId,
+            advertisementId = advertisementId,
+            sessionId = SessionId.generate(),
+            engagementType = engagementType
+        )
+        engagements[engagement.id] = engagement
+        return engagement
     }
 }

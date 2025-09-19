@@ -1,57 +1,101 @@
 databases:
-  - name: postgres-db-puntog
-    databaseName: puntog
-    user: puntog
+  - name: gasolinera-postgres
+    databaseName: gasolinera_db
+    user: gasolinera_user
     plan: free
     postgresMajorVersion: 16
 
-  - name: redis-cache-puntog
+  - name: gasolinera-redis
     type: redis
     plan: free
     ipAllowList: []
 
 services:
+  # API Gateway - Punto de entrada principal
   - type: web
-    name: api-gateway
+    name: gasolinera-api-gateway
     plan: free
     runtime: docker
     dockerfilePath: ./services/api-gateway/Dockerfile
     dockerContext: .
+    buildCommand: "./gradlew :services:api-gateway:build -x test --no-daemon"
     envVars:
-      - fromGroup: puntog-secrets
+      - key: SPRING_PROFILES_ACTIVE
+        value: production
+      - key: SERVER_PORT
+        value: 8080
+      - key: DATABASE_URL
+        fromDatabase:
+          name: gasolinera-postgres
+          property: connectionString
+      - key: REDIS_URL
+        fromDatabase:
+          name: gasolinera-redis
+          property: connectionString
 
+  # Auth Service
   - type: pserv
-    name: auth-service
+    name: gasolinera-auth-service
     plan: free
     runtime: docker
     dockerfilePath: ./services/auth-service/Dockerfile
     dockerContext: .
+    buildCommand: "./gradlew :services:auth-service:build -x test --no-daemon"
     envVars:
-      - fromGroup: puntog-secrets
+      - key: SPRING_PROFILES_ACTIVE
+        value: production
+      - key: SERVER_PORT
+        value: 8091
+      - key: DATABASE_URL
+        fromDatabase:
+          name: gasolinera-postgres
+          property: connectionString
 
+  # Station Service
   - type: pserv
-    name: redemption-service
+    name: gasolinera-station-service
     plan: free
     runtime: docker
-    dockerfilePath: ./services/redemption-service/Dockerfile
+    dockerfilePath: ./services/station-service/Dockerfile
     dockerContext: .
+    buildCommand: "./gradlew :services:station-service:build -x test --no-daemon"
     envVars:
-      - fromGroup: puntog-secrets
+      - key: SPRING_PROFILES_ACTIVE
+        value: production
+      - key: SERVER_PORT
+        value: 8092
+      - key: DATABASE_URL
+        fromDatabase:
+          name: gasolinera-postgres
+          property: connectionString
 
+  # Coupon Service
   - type: pserv
-    name: ad-engine
+    name: gasolinera-coupon-service
     plan: free
     runtime: docker
-    dockerfilePath: ./services/ad-engine/Dockerfile
+    dockerfilePath: ./services/coupon-service/Dockerfile
     dockerContext: .
+    buildCommand: "./gradlew :services:coupon-service:build -x test --no-daemon"
     envVars:
-      - fromGroup: puntog-secrets
+      - key: SPRING_PROFILES_ACTIVE
+        value: production
+      - key: SERVER_PORT
+        value: 8093
+      - key: DATABASE_URL
+        fromDatabase:
+          name: gasolinera-postgres
+          property: connectionString
 
-  - type: pserv
-    name: raffle-service
+  # Frontend Admin (si existe)
+  - type: web
+    name: gasolinera-admin-frontend
     plan: free
-    runtime: docker
-    dockerfilePath: ./services/raffle-service/Dockerfile
-    dockerContext: .
+    runtime: node
+    buildCommand: "cd apps/admin && npm install && npm run build"
+    startCommand: "cd apps/admin && npm start"
     envVars:
-      - fromGroup: puntog-secrets
+      - key: NEXT_PUBLIC_API_URL
+        value: https://gasolinera-api-gateway.onrender.com
+      - key: NODE_ENV
+        value: production

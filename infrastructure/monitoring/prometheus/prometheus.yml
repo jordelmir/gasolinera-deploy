@@ -1,0 +1,75 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  # - "first_rules.yml"
+  # - "second_rules.yml"
+
+scrape_configs:
+  # Prometheus itself
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  # Auth Service
+  - job_name: "auth-service"
+    metrics_path: "/actuator/prometheus"
+    static_configs:
+      - targets: ["host.docker.internal:8080"]
+    scrape_interval: 5s
+
+  # Coupon Service
+  - job_name: "coupon-service"
+    metrics_path: "/actuator/prometheus"
+    static_configs:
+      - targets: ["host.docker.internal:8081"]
+    scrape_interval: 5s
+
+  # Station Service
+  - job_name: "station-service"
+    metrics_path: "/actuator/prometheus"
+    static_configs:
+      - targets: ["host.docker.internal:8082"]
+    scrape_interval: 5s
+
+  # Redemption Service
+  - job_name: "redemption-service"
+    metrics_path: "/actuator/prometheus"
+    static_configs:
+      - targets: ["host.docker.internal:8083"]
+    scrape_interval: 5s
+
+  # Ad Engine Service
+  - job_name: "ad-engine-service"
+    metrics_path: "/actuator/prometheus"
+    static_configs:
+      - targets: ["host.docker.internal:8084"]
+    scrape_interval: 5s
+
+  # Raffle Service
+  - job_name: "raffle-service"
+    metrics_path: "/actuator/prometheus"
+    static_configs:
+      - targets: ["host.docker.internal:8085"]
+    scrape_interval: 5s
+
+  # System metrics
+  - job_name: "node-exporter"
+    static_configs:
+      - targets: ["host.docker.internal:9100"]
+
+  # PostgreSQL metrics
+  - job_name: "postgres-exporter"
+    static_configs:
+      - targets: ["host.docker.internal:9187"]
+
+  # Redis metrics
+  - job_name: "redis-exporter"
+    static_configs:
+      - targets: ["host.docker.internal:9121"]
+
+  # RabbitMQ metrics
+  - job_name: "rabbitmq"
+    static_configs:
+      - targets: ["rabbitmq:15692"]

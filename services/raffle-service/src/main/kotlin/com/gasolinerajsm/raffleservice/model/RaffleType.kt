@@ -6,5 +6,6 @@ enum class RaffleType {
     SPECIAL,
     CAR_RAFFLE,
     INSTANT_WIN,
-    SEASONAL
+    SEASONAL,
+    TIERED
 }

@@ -344,7 +344,7 @@ private fun RaffleTicket.toDto(): RaffleTicketDto {
     return RaffleTicketDto(
         id = this.id,
         userId = this.userId,
-        raffleId = this.raffle.id,
+        raffleId = this.raffle.id!!,
         raffleName = this.raffle.name,
         ticketNumber = this.ticketNumber,
         status = this.status,
@@ -379,7 +379,7 @@ private fun RaffleTicket.toDto(): RaffleTicketDto {
 
 private fun Raffle.toEntryInfo(): RaffleEntryInfo {
     return RaffleEntryInfo(
-        raffleId = this.id,
+        raffleId = this.id!!,
         raffleName = this.name,
         registrationEndsAt = this.registrationEnd,
         drawDate = this.drawDate,
@@ -398,10 +398,10 @@ private fun Map<String, Any>.toUserTicketStatisticsDto(): UserTicketStatisticsDt
     )
 }
 
-private fun RaffleWinner.toDto(): RaffleWinnerDto {
+internal fun RaffleWinner.toDto(): RaffleWinnerDto {
     return RaffleWinnerDto(
         id = this.id,
-        raffleId = this.raffle.id,
+        raffleId = this.raffle.id!!,
         raffleName = this.raffle.name,
         userId = this.userId,
         ticketId = this.ticket.id,

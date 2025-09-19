@@ -164,7 +164,7 @@ class TicketValidationService(
      * Validate raffle status and timing
      */
     private fun validateRaffleStatus(raffle: Raffle) {
-        if (!raffle.status.allowsRegistration()) {
+        if (!raffle.allowsRegistration()) {
             throw IllegalStateException("Raffle status '${raffle.status}' does not allow registration")
         }
 
@@ -198,9 +198,7 @@ class TicketValidationService(
      * Validate user eligibility
      */
     private fun validateUserEligibility(userId: Long, raffle: Raffle, additionalTickets: Int) {
-        val currentUserTickets = raffleTicketRepository.countByUserIdAndRaffleIdAndStatus(
-            userId, raffle.id, TicketStatus.ACTIVE
-        )
+        val currentUserTickets = raffleTicketRepository.countByUserIdAndRaffleIdAndStatus(userId, raffle.id!!, TicketStatus.ACTIVE)
 
         val totalUserTickets = currentUserTickets + additionalTickets
 
@@ -324,9 +322,7 @@ class TicketValidationService(
             val raffle = raffleRepository.findById(raffleId)
                 .orElseThrow { NoSuchElementException("Raffle not found") }
 
-            val userTicketCount = raffleTicketRepository.countByUserIdAndRaffleIdAndStatus(
-                userId, raffleId, TicketStatus.ACTIVE
-            )
+            val userTicketCount = raffleTicketRepository.countByUserIdAndRaffleIdAndStatus(userId, raffleId, TicketStatus.ACTIVE)
 
             return ValidationSummary(
                 canEnter = raffle.isRegistrationOpen() && raffle.canAcceptMoreParticipants(),

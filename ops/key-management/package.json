@@ -1,0 +1,30 @@
+{
+  "name": "gasolinera-jsm-key-management",
+  "version": "1.0.0",
+  "description": "Key management utilities for Gasolinera JSM QR code signing",
+  "main": "sign-qr.ts",
+  "scripts": {
+    "generate-keys": "kotlin generate-keys.kt",
+    "sign-qr": "ts-node sign-qr.ts",
+    "verify-qr": "ts-node verify-qr.ts",
+    "test-qr-flow": "npm run generate-keys && npm run sign-qr && npm run verify-qr"
+  },
+  "dependencies": {
+    "uuid": "^9.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/uuid": "^9.0.0",
+    "ts-node": "^10.9.0",
+    "typescript": "^5.0.0"
+  },
+  "keywords": [
+    "qr-code",
+    "cryptography",
+    "gas-station",
+    "security",
+    "signing"
+  ],
+  "author": "Gasolinera JSM Team",
+  "license": "MIT"
+}

@@ -1,0 +1,159 @@
+# Configuración de Alertmanager para Gasolinera JSM
+global:
+  smtp_smarthost: "${SMTP_HOST:-localhost:587}"
+  smtp_from: "${ALERT_EMAIL_FROM:-alerts@gasolinerajsm.com}"
+  smtp_auth_username: "${SMTP_USERNAME:-}"
+  smtp_auth_password: "${SMTP_PASSWORD:-}"
+
+# Plantillas de notificaciones
+templates:
+  - "/etc/alertmanager/templates/*.tmpl"
+
+# Configuración de rutas
+route:
+  group_by: ["alertname", "cluster", "service"]
+  group_wait: 10s
+  group_interval: 10s
+  repeat_interval: 1h
+  receiver: "default-receiver"
+  routes:
+    # Alertas críticas - notificación inmediata
+    - match:
+        severity: critical
+      receiver: "critical-alerts"
+      group_wait: 0s
+      repeat_interval: 5m
+
+    # Alertas de seguridad
+    - match:
+        category: security
+      receiver: "security-alerts"
+      group_wait: 0s
+      repeat_interval: 15m
+
+    # Alertas de base de datos
+    - match:
+        category: database
+      receiver: "database-alerts"
+      repeat_interval: 30m
+
+    # Alertas de API
+    - match:
+        category: api
+      receiver: "api-alerts"
+      repeat_interval: 15m
+
+    # Alertas de infraestructura
+    - match:
+        category: infrastructure
+      receiver: "infrastructure-alerts"
+      repeat_interval: 30m
+
+# Supresión de alertas
+inhibit_rules:
+  # Suprimir alertas de servicios si el servicio está completamente caído
+  - source_match:
+      alertname: "ServiceDown"
+    target_match_re:
+      alertname: "(HighMemoryUsage|HighCPUUsage|HighResponseTime)"
+    equal: ["job", "instance"]
+
+# Configuración de receptores
+receivers:
+  - name: "default-receiver"
+    email_configs:
+      - to: "${DEFAULT_EMAIL:-admin@gasolinerajsm.com}"
+        subject: "[Gasolinera JSM] {{ .GroupLabels.alertname }}"
+        body: |
+          {{ range .Alerts }}
+          **Alerta:** {{ .Annotations.summary }}
+          **Descripción:** {{ .Annotations.description }}
+          **Severidad:** {{ .Labels.severity }}
+          **Servicio:** {{ .Labels.job }}
+          **Tiempo:** {{ .StartsAt.Format "2006-01-02 15:04:05" }}
+          {{ end }}
+
+  - name: "critical-alerts"
+    email_configs:
+      - to: "${CRITICAL_EMAIL:-admin@gasolinerajsm.com,ops@gasolinerajsm.com}"
+        subject: "🚨 [CRÍTICO] Gasolinera JSM - {{ .GroupLabels.alertname }}"
+        body: |
+          ⚠️ **ALERTA CRÍTICA** ⚠️
+
+          {{ range .Alerts }}
+          **Alerta:** {{ .Annotations.summary }}
+          **Descripción:** {{ .Annotations.description }}
+          **Servicio:** {{ .Labels.job }}
+          **Instancia:** {{ .Labels.instance }}
+          **Tiempo:** {{ .StartsAt.Format "2006-01-02 15:04:05" }}
+
+          **Acción requerida:** Intervención inmediata necesaria
+          {{ end }}
+    slack_configs:
+      - api_url: "${SLACK_WEBHOOK_URL:-}"
+        channel: "#alerts-critical"
+        title: "🚨 Alerta Crítica - Gasolinera JSM"
+        text: |
+          {{ range .Alerts }}
+          *{{ .Annotations.summary }}*
+          {{ .Annotations.description }}
+          Servicio: {{ .Labels.job }}
+          {{ end }}
+
+  - name: "security-alerts"
+    email_configs:
+      - to: "${SECURITY_EMAIL:-security@gasolinerajsm.com}"
+        subject: "🔒 [SEGURIDAD] Gasolinera JSM - {{ .GroupLabels.alertname }}"
+        body: |
+          🔒 **ALERTA DE SEGURIDAD** 🔒
+
+          {{ range .Alerts }}
+          **Evento:** {{ .Annotations.summary }}
+          **Detalles:** {{ .Annotations.description }}
+          **Servicio:** {{ .Labels.job }}
+          **Tiempo:** {{ .StartsAt.Format "2006-01-02 15:04:05" }}
+
+          **Revisión de seguridad requerida**
+          {{ end }}
+
+  - name: "database-alerts"
+    email_configs:
+      - to: "${DBA_EMAIL:-dba@gasolinerajsm.com}"
+        subject: "🗄️ [BASE DE DATOS] Gasolinera JSM - {{ .GroupLabels.alertname }}"
+        body: |
+          🗄️ **ALERTA DE BASE DE DATOS** 🗄️
+
+          {{ range .Alerts }}
+          **Problema:** {{ .Annotations.summary }}
+          **Descripción:** {{ .Annotations.description }}
+          **Base de datos:** {{ .Labels.pool | default "N/A" }}
+          **Tiempo:** {{ .StartsAt.Format "2006-01-02 15:04:05" }}
+          {{ end }}
+
+  - name: "api-alerts"
+    email_configs:
+      - to: "${API_EMAIL:-api-team@gasolinerajsm.com}"
+        subject: "🌐 [API] Gasolinera JSM - {{ .GroupLabels.alertname }}"
+        body: |
+          🌐 **ALERTA DE API** 🌐
+
+          {{ range .Alerts }}
+          **Problema:** {{ .Annotations.summary }}
+          **Descripción:** {{ .Annotations.description }}
+          **Endpoint:** {{ .Labels.path | default "N/A" }}
+          **Tiempo:** {{ .StartsAt.Format "2006-01-02 15:04:05" }}
+          {{ end }}
+
+  - name: "infrastructure-alerts"
+    email_configs:
+      - to: "${INFRA_EMAIL:-infra@gasolinerajsm.com}"
+        subject: "🏗️ [INFRAESTRUCTURA] Gasolinera JSM - {{ .GroupLabels.alertname }}"
+        body: |
+          🏗️ **ALERTA DE INFRAESTRUCTURA** 🏗️
+
+          {{ range .Alerts }}
+          **Problema:** {{ .Annotations.summary }}
+          **Descripción:** {{ .Annotations.description }}
+          **Servidor:** {{ .Labels.instance | default "N/A" }}
+          **Tiempo:** {{ .StartsAt.Format "2006-01-02 15:04:05" }}
+          {{ end }}

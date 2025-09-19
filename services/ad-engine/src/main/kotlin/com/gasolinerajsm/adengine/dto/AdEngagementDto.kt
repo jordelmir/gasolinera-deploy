@@ -1,7 +1,7 @@
 package com.gasolinerajsm.adengine.dto
 
-import com.gasolinerajsm.adengine.model.EngagementStatus
-import com.gasolinerajsm.adengine.model.EngagementType
+import com.gasolinerajsm.adengine.domain.model.EngagementStatus
+import com.gasolinerajsm.adengine.domain.model.EngagementType
 import jakarta.validation.constraints.*
 import java.math.BigDecimal
 import java.time.LocalDateTime

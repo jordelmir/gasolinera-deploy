@@ -8,7 +8,8 @@ enum class RaffleType(val displayName: String, val description: String) {
     WEEKLY("Weekly Raffle", "Weekly raffle with 7-day cycle"),
     MONTHLY("Monthly Raffle", "Monthly raffle with 30-day cycle"),
     SPECIAL("Special Event", "Special event raffle"),
-    INSTANT("Instant Win", "Instant win raffle"),
+    INSTANT_WIN("Instant Win", "Instant win raffle"),
+    TIERED("Tiered", "Tiered raffle with multiple prize levels"),
     PROGRESSIVE("Progressive", "Progressive jackpot raffle"),
     SEASONAL("Seasonal", "Seasonal themed raffle");
 
@@ -21,7 +22,8 @@ enum class RaffleType(val displayName: String, val description: String) {
             WEEKLY -> 7
             MONTHLY -> 30
             SPECIAL -> 14
-            INSTANT -> 1
+            INSTANT_WIN -> 1
+            TIERED -> 7
             PROGRESSIVE -> 30
             SEASONAL -> 90
         }
@@ -38,7 +40,7 @@ enum class RaffleType(val displayName: String, val description: String) {
      * Check if raffle type supports instant wins
      */
     fun supportsInstantWin(): Boolean {
-        return this == INSTANT || this == PROGRESSIVE
+        return this == INSTANT_WIN || this == PROGRESSIVE || this == TIERED
     }
 }
 

@@ -2,6 +2,7 @@ package com.gasolinerajsm.authservice.controller
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.gasolinerajsm.authservice.dto.*
+import com.gasolinerajsm.authservice.infrastructure.web.AuthController
 import com.gasolinerajsm.authservice.model.User
 import com.gasolinerajsm.authservice.model.UserRole
 import com.gasolinerajsm.authservice.service.AuthService

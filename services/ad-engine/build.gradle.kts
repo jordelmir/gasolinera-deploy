@@ -48,6 +48,9 @@ dependencies {
     // --- Logging ---
     implementation("net.logstash.logback:logstash-logback-encoder:7.4") // For structured JSON logging
 
+    // --- Annotations (for @PostConstruct) - Jakarta EE for Spring Boot 3 ---
+    implementation("jakarta.annotation:jakarta.annotation-api")
+
     // --- Kotlin y Jackson ---
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
 
@@ -55,6 +58,10 @@ dependencies {
 
     // --- Base de Datos ---
     runtimeOnly("org.postgresql:postgresql")
+
+    // --- Shared Modules ---
+    implementation(project(":shared:messaging"))
+    implementation(project(":shared:common"))
 
     // --- Tests ---
     testImplementation("org.springframework.boot:spring-boot-starter-test") {

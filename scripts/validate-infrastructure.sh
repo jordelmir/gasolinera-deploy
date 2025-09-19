@@ -1,297 +1,448 @@
 #!/bin/bash
-# Infrastructure Validation Script for Gasolinera JSM Platform
+
+# Script para validar que toda la infraestructura esté funcionando correctamente
+# Uso: ./validate-infrastructure.sh [--detailed] [--fix-issues]
 
 set -e
 
-echo "🚀 Gasolinera JSM Platform - Infrastructure Validation"
-echo "======================================================"
-
-# Colors for output
+# Colores para output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-# Function to print colored output
-print_status() {
-    local status=$1
-    local message=$2
-    case $status in
-        "SUCCESS")
-            echo -e "${GREEN}✅ $message${NC}"
+# Variables
+DETAILED=false
+FIX_ISSUES=false
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+
+# Procesar argumentos
+for arg in "$@"; do
+    case $arg in
+        --detailed)
+            DETAILED=true
+            shift
             ;;
-        "ERROR")
-            echo -e "${RED}❌ $message${NC}"
-            ;;
-        "WARNING")
-            echo -e "${YELLOW}⚠️  $message${NC}"
-            ;;
-        "INFO")
-            echo -e "${BLUE}ℹ️  $message${NC}"
+        --fix-issues)
+            FIX_ISSUES=true
+            shift
             ;;
     esac
+done
+
+# Contadores
+TOTAL_CHECKS=0
+PASSED_CHECKS=0
+FAILED_CHECKS=0
+WARNING_CHECKS=0
+
+echo -e "${BLUE}🔍 Validando infraestructura de Gasolinera JSM${NC}"
+echo ""
+
+# Funciones de utilidad
+show_progress() {
+    echo -e "${GREEN}✅ $1${NC}"
+    ((PASSED_CHECKS++))
 }
 
-# Function to check if a service is running
-check_service() {
-    local service_name=$1
-    local container_name=$2
+show_warning() {
+    echo -e "${YELLOW}⚠️  $1${NC}"
+    ((WARNING_CHECKS++))
+}
 
-    if docker ps --format "table {{.Names}}" | grep -q "^${container_name}$"; then
-        print_status "SUCCESS" "$service_name is running"
-        return 0
-    else
-        print_status "ERROR" "$service_name is not running"
-        return 1
+show_error() {
+    echo -e "${RED}❌ $1${NC}"
+    ((FAILED_CHECKS++))
+}
+
+show_info() {
+    echo -e "${BLUE}ℹ️  $1${NC}"
+}
+
+run_check() {
+    ((TOTAL_CHECKS++))
+    if [ "$DETAILED" = true ]; then
+        echo -e "${BLUE}Ejecutando: $1${NC}"
     fi
 }
 
-# Function to check service health
-check_health() {
-    local service_name=$1
-    local health_url=$2
-    local expected_status=${3:-"UP"}
+# Verificar variables de entorno
+check_environment_variables() {
+    show_info "Verificando variables de entorno..."
 
-    print_status "INFO" "Checking $service_name health..."
+    cd "$PROJECT_ROOT"
 
-    if response=$(curl -s "$health_url" 2>/dev/null); then
-        if echo "$response" | grep -q "$expected_status"; then
-            print_status "SUCCESS" "$service_name health check passed"
-            return 0
+    run_check "Archivo .env existe"
+    if [ -f ".env" ]; then
+        show_progress "Archivo .env encontrado"
+    else
+        show_error "Archivo .env no encontrado"
+        return
+    fi
+
+    # Cargar variables
+    source .env
+
+    # Variables críticas
+    critical_vars=(
+        "DB_HOST" "DB_NAME" "DB_USERNAME" "DB_PASSWORD"
+        "JWT_SECRET" "REDIS_HOST" "RABBITMQ_HOST"
+        "AUTH_SERVICE_URL" "API_GATEWAY_URL"
+    )
+
+    for var in "${critical_vars[@]}"; do
+        run_check "Variable $var está definida"
+        if [ -n "${!var}" ]; then
+            show_progress "Variable $var: ✓"
         else
-            print_status "WARNING" "$service_name health check returned unexpected status: $response"
-            return 1
+            show_error "Variable $var no está definida"
         fi
+    done
+
+    # Verificar JWT_SECRET no sea el valor por defecto
+    run_check "JWT_SECRET no es valor por defecto"
+    if [[ "$JWT_SECRET" == *"change-this-in-production"* ]]; then
+        show_warning "JWT_SECRET usa valor por defecto - cambiar en producción"
     else
-        print_status "ERROR" "$service_name health check failed - service not responding"
-        return 1
+        show_progress "JWT_SECRET configurado correctamente"
     fi
 }
 
-# Function to check database connectivity
-check_database() {
-    print_status "INFO" "Checking PostgreSQL connectivity..."
+# Verificar servicios Docker
+check_docker_services() {
+    show_info "Verificando servicios Docker..."
 
-    if docker exec postgres pg_isready -U gasolinera_user -d gasolinera_jsm >/dev/null 2>&1; then
-        print_status "SUCCESS" "PostgreSQL is ready and accepting connections"
+    cd "$PROJECT_ROOT"
 
-        # Check if schemas exist
-        schema_count=$(docker exec postgres psql -U gasolinera_user -d gasolinera_jsm -t -c "SELECT count(*) FROM information_schema.schemata WHERE schema_name IN ('auth_schema', 'station_schema', 'coupon_schema', 'redemption_schema', 'ad_schema', 'raffle_schema');" 2>/dev/null | tr -d ' ')
-
-        if [ "$schema_count" = "6" ]; then
-            print_status "SUCCESS" "All required database schemas are present"
-        else
-            print_status "WARNING" "Some database schemas are missing (found $schema_count/6)"
-        fi
+    run_check "Docker está funcionando"
+    if docker info &> /dev/null; then
+        show_progress "Docker está funcionando"
     else
-        print_status "ERROR" "PostgreSQL is not ready"
-        return 1
-    fi
-}
-
-# Function to check Redis connectivity
-check_redis() {
-    print_status "INFO" "Checking Redis connectivity..."
-
-    if docker exec redis redis-cli ping >/dev/null 2>&1; then
-        print_status "SUCCESS" "Redis is responding to ping"
-    else
-        print_status "ERROR" "Redis is not responding"
-        return 1
-    fi
-}
-
-# Function to check RabbitMQ connectivity
-check_rabbitmq() {
-    print_status "INFO" "Checking RabbitMQ connectivity..."
-
-    if docker exec rabbitmq rabbitmqctl status >/dev/null 2>&1; then
-        print_status "SUCCESS" "RabbitMQ is running and healthy"
-
-        # Check if exchanges exist
-        if docker exec rabbitmq rabbitmqctl list_exchanges | grep -q "gasolinera.events"; then
-            print_status "SUCCESS" "RabbitMQ exchanges are configured"
-        else
-            print_status "WARNING" "RabbitMQ exchanges may not be configured"
-        fi
-    else
-        print_status "ERROR" "RabbitMQ is not responding"
-        return 1
-    fi
-}
-
-# Function to check Vault connectivity
-check_vault() {
-    print_status "INFO" "Checking HashiCorp Vault connectivity..."
-
-    if docker exec vault vault status >/dev/null 2>&1; then
-        print_status "SUCCESS" "Vault is running and accessible"
-
-        # Check if secrets are configured
-        if docker exec vault vault kv list secret/ 2>/dev/null | grep -q "database"; then
-            print_status "SUCCESS" "Vault secrets are configured"
-        else
-            print_status "WARNING" "Vault secrets may not be configured"
-        fi
-    else
-        print_status "ERROR" "Vault is not responding"
-        return 1
-    fi
-}
-
-# Function to check Jaeger connectivity
-check_jaeger() {
-    print_status "INFO" "Checking Jaeger connectivity..."
-
-    if curl -s http://localhost:16686/api/services >/dev/null 2>&1; then
-        print_status "SUCCESS" "Jaeger is accessible"
-    else
-        print_status "WARNING" "Jaeger UI is not accessible"
-    fi
-}
-
-# Function to validate network connectivity between services
-check_network_connectivity() {
-    print_status "INFO" "Checking network connectivity between services..."
-
-    # Test database connectivity from auth service
-    if docker exec auth-service nc -z postgres 5432 >/dev/null 2>&1; then
-        print_status "SUCCESS" "Auth service can reach PostgreSQL"
-    else
-        print_status "ERROR" "Auth service cannot reach PostgreSQL"
+        show_error "Docker no está funcionando"
+        return
     fi
 
-    # Test Redis connectivity from auth service
-    if docker exec auth-service nc -z redis 6379 >/dev/null 2>&1; then
-        print_status "SUCCESS" "Auth service can reach Redis"
+    run_check "Docker Compose está disponible"
+    if command -v docker-compose &> /dev/null; then
+        show_progress "Docker Compose disponible"
     else
-        print_status "ERROR" "Auth service cannot reach Redis"
+        show_error "Docker Compose no está disponible"
+        return
     fi
 
-    # Test RabbitMQ connectivity from coupon service
-    if docker exec coupon-service nc -z rabbitmq 5672 >/dev/null 2>&1; then
-        print_status "SUCCESS" "Coupon service can reach RabbitMQ"
-    else
-        print_status "ERROR" "Coupon service cannot reach RabbitMQ"
-    fi
-}
-
-# Function to check API endpoints
-check_api_endpoints() {
-    print_status "INFO" "Checking API endpoints..."
-
-    # Wait a bit for services to be fully ready
-    sleep 5
-
-    # Check API Gateway
-    if curl -s http://localhost:8080/actuator/health >/dev/null 2>&1; then
-        print_status "SUCCESS" "API Gateway is accessible"
-    else
-        print_status "WARNING" "API Gateway is not accessible yet"
-    fi
-
-    # Check individual services
-    services=("auth-service:8081" "redemption-service:8082" "station-service:8083" "ad-engine:8084" "raffle-service:8085" "coupon-service:8086")
+    # Verificar servicios específicos
+    services=("postgres" "redis" "rabbitmq")
 
     for service in "${services[@]}"; do
-        IFS=':' read -r name port <<< "$service"
-        if curl -s "http://localhost:$port/actuator/health" >/dev/null 2>&1; then
-            print_status "SUCCESS" "$name is accessible on port $port"
+        run_check "Servicio $service está funcionando"
+        if docker-compose -f docker-compose.simple.yml ps "$service" | grep -q "Up"; then
+            show_progress "Servicio $service: ✓"
         else
-            print_status "WARNING" "$name is not accessible on port $port yet"
+            show_error "Servicio $service no está funcionando"
+            if [ "$FIX_ISSUES" = true ]; then
+                show_info "Intentando reiniciar $service..."
+                docker-compose -f docker-compose.simple.yml restart "$service"
+            fi
         fi
     done
 }
 
-# Main validation function
-main() {
-    echo ""
-    print_status "INFO" "Starting infrastructure validation..."
-    echo ""
+# Verificar conectividad de base de datos
+check_database_connectivity() {
+    show_info "Verificando conectividad de base de datos..."
 
-    # Check if Docker is running
-    if ! docker info >/dev/null 2>&1; then
-        print_status "ERROR" "Docker is not running or not accessible"
-        exit 1
+    cd "$PROJECT_ROOT"
+    source .env
+
+    run_check "PostgreSQL está respondiendo"
+    if docker-compose -f docker-compose.simple.yml exec -T postgres pg_isready -U "$DB_USERNAME" -d "$DB_NAME" &> /dev/null; then
+        show_progress "PostgreSQL está respondiendo"
+    else
+        show_error "PostgreSQL no está respondiendo"
+        if [ "$FIX_ISSUES" = true ]; then
+            show_info "Intentando reiniciar PostgreSQL..."
+            docker-compose -f docker-compose.simple.yml restart postgres
+            sleep 10
+        fi
+        return
     fi
 
-    print_status "SUCCESS" "Docker is running"
-    echo ""
+    run_check "Puede conectar a la base de datos"
+    if docker-compose -f docker-compose.simple.yml exec -T postgres psql -U "$DB_USERNAME" -d "$DB_NAME" -c "SELECT 1;" &> /dev/null; then
+        show_progress "Conexión a BD exitosa"
+    else
+        show_error "No se puede conectar a la base de datos"
+        return
+    fi
 
-    # Check infrastructure services
-    echo "🔍 Checking Infrastructure Services"
-    echo "=================================="
-
-    check_service "PostgreSQL" "postgres"
-    check_service "Redis" "redis"
-    check_service "RabbitMQ" "rabbitmq"
-    check_service "Vault" "vault"
-    check_service "Jaeger" "jaeger"
-
-    echo ""
-
-    # Check infrastructure connectivity
-    echo "🔗 Checking Infrastructure Connectivity"
-    echo "======================================"
-
-    check_database
-    check_redis
-    check_rabbitmq
-    check_vault
-    check_jaeger
-
-    echo ""
-
-    # Check microservices
-    echo "🏗️  Checking Microservices"
-    echo "========================="
-
-    check_service "API Gateway" "api-gateway"
-    check_service "Auth Service" "auth-service"
-    check_service "Redemption Service" "redemption-service"
-    check_service "Station Service" "station-service"
-    check_service "Ad Engine" "ad-engine"
-    check_service "Raffle Service" "raffle-service"
-    check_service "Coupon Service" "coupon-service"
-
-    echo ""
-
-    # Check network connectivity
-    echo "🌐 Checking Network Connectivity"
-    echo "==============================="
-
-    check_network_connectivity
-
-    echo ""
-
-    # Check API endpoints
-    echo "🔌 Checking API Endpoints"
-    echo "========================"
-
-    check_api_endpoints
-
-    echo ""
-    echo "🎉 Infrastructure validation completed!"
-    echo "======================================"
-
-    # Summary
-    echo ""
-    print_status "INFO" "Summary of accessible services:"
-    echo "- API Gateway: http://localhost:8080"
-    echo "- Auth Service: http://localhost:8081"
-    echo "- Redemption Service: http://localhost:8082"
-    echo "- Station Service: http://localhost:8083"
-    echo "- Ad Engine: http://localhost:8084"
-    echo "- Raffle Service: http://localhost:8085"
-    echo "- Coupon Service: http://localhost:8086"
-    echo "- Jaeger UI: http://localhost:16686"
-    echo "- RabbitMQ Management: http://localhost:15672"
-    echo "- Vault UI: http://localhost:8200"
-
-    echo ""
-    print_status "SUCCESS" "Infrastructure validation completed successfully!"
+    # Verificar esquemas
+    schemas=("auth_schema" "station_schema" "coupon_schema" "raffle_schema")
+    for schema in "${schemas[@]}"; do
+        run_check "Esquema $schema existe"
+        if docker-compose -f docker-compose.simple.yml exec -T postgres psql -U "$DB_USERNAME" -d "$DB_NAME" -c "SELECT schema_name FROM information_schema.schemata WHERE schema_name = '$schema';" | grep -q "$schema"; then
+            show_progress "Esquema $schema: ✓"
+        else
+            show_warning "Esquema $schema no encontrado"
+        fi
+    done
 }
 
-# Run main function
+# Verificar Redis
+check_redis_connectivity() {
+    show_info "Verificando conectividad de Redis..."
+
+    cd "$PROJECT_ROOT"
+
+    run_check "Redis está respondiendo"
+    if docker-compose -f docker-compose.simple.yml exec -T redis redis-cli ping | grep -q "PONG"; then
+        show_progress "Redis está respondiendo"
+    else
+        show_error "Redis no está respondiendo"
+        if [ "$FIX_ISSUES" = true ]; then
+            show_info "Intentando reiniciar Redis..."
+            docker-compose -f docker-compose.simple.yml restart redis
+        fi
+        return
+    fi
+
+    run_check "Redis puede almacenar datos"
+    if docker-compose -f docker-compose.simple.yml exec -T redis redis-cli set test_key "test_value" | grep -q "OK"; then
+        show_progress "Redis puede almacenar datos"
+        docker-compose -f docker-compose.simple.yml exec -T redis redis-cli del test_key &> /dev/null
+    else
+        show_error "Redis no puede almacenar datos"
+    fi
+}
+
+# Verificar RabbitMQ
+check_rabbitmq_connectivity() {
+    show_info "Verificando conectividad de RabbitMQ..."
+
+    cd "$PROJECT_ROOT"
+    source .env
+
+    run_check "RabbitMQ está funcionando"
+    if docker-compose -f docker-compose.simple.yml exec -T rabbitmq rabbitmqctl status &> /dev/null; then
+        show_progress "RabbitMQ está funcionando"
+    else
+        show_error "RabbitMQ no está funcionando"
+        if [ "$FIX_ISSUES" = true ]; then
+            show_info "Intentando reiniciar RabbitMQ..."
+            docker-compose -f docker-compose.simple.yml restart rabbitmq
+        fi
+        return
+    fi
+
+    run_check "Virtual host existe"
+    if docker-compose -f docker-compose.simple.yml exec -T rabbitmq rabbitmqctl list_vhosts | grep -q "$RABBITMQ_VIRTUAL_HOST"; then
+        show_progress "Virtual host configurado"
+    else
+        show_warning "Virtual host no encontrado"
+        if [ "$FIX_ISSUES" = true ]; then
+            show_info "Creando virtual host..."
+            docker-compose -f docker-compose.simple.yml exec -T rabbitmq rabbitmqctl add_vhost "$RABBITMQ_VIRTUAL_HOST"
+        fi
+    fi
+}
+
+# Verificar claves de seguridad
+check_security_keys() {
+    show_info "Verificando claves de seguridad..."
+
+    cd "$PROJECT_ROOT"
+
+    run_check "Clave privada QR existe"
+    if [ -f "ops/key-management/private-key.pem" ]; then
+        show_progress "Clave privada QR: ✓"
+    else
+        show_error "Clave privada QR no encontrada"
+        if [ "$FIX_ISSUES" = true ]; then
+            show_info "Generando claves QR..."
+            cd ops/key-management
+            openssl genrsa -out private-key.pem 2048
+            openssl rsa -in private-key.pem -pubout -out public-key.pem
+            chmod 600 private-key.pem
+            chmod 644 public-key.pem
+            cd "$PROJECT_ROOT"
+        fi
+    fi
+
+    run_check "Clave pública QR existe"
+    if [ -f "ops/key-management/public-key.pem" ]; then
+        show_progress "Clave pública QR: ✓"
+    else
+        show_error "Clave pública QR no encontrada"
+    fi
+
+    # Verificar permisos
+    if [ -f "ops/key-management/private-key.pem" ]; then
+        run_check "Permisos de clave privada son seguros"
+        perms=$(stat -c "%a" ops/key-management/private-key.pem)
+        if [ "$perms" = "600" ]; then
+            show_progress "Permisos de clave privada: ✓"
+        else
+            show_warning "Permisos de clave privada no son seguros ($perms)"
+            if [ "$FIX_ISSUES" = true ]; then
+                chmod 600 ops/key-management/private-key.pem
+                show_info "Permisos corregidos"
+            fi
+        fi
+    fi
+}
+
+# Verificar directorios
+check_directories() {
+    show_info "Verificando estructura de directorios..."
+
+    cd "$PROJECT_ROOT"
+
+    directories=(
+        "logs" "logs/requests" "logs/responses" "logs/errors"
+        "data/uploads" "data/exports" "data/backups"
+        "monitoring/prometheus" "monitoring/grafana"
+    )
+
+    for dir in "${directories[@]}"; do
+        run_check "Directorio $dir existe"
+        if [ -d "$dir" ]; then
+            show_progress "Directorio $dir: ✓"
+        else
+            show_warning "Directorio $dir no existe"
+            if [ "$FIX_ISSUES" = true ]; then
+                mkdir -p "$dir"
+                show_info "Directorio $dir creado"
+            fi
+        fi
+    done
+}
+
+# Verificar puertos
+check_ports() {
+    show_info "Verificando puertos..."
+
+    ports=(
+        "5432:PostgreSQL"
+        "6379:Redis"
+        "5672:RabbitMQ"
+        "15672:RabbitMQ Management"
+    )
+
+    for port_info in "${ports[@]}"; do
+        port=$(echo "$port_info" | cut -d: -f1)
+        service=$(echo "$port_info" | cut -d: -f2)
+
+        run_check "Puerto $port ($service) está disponible"
+        if netstat -tuln 2>/dev/null | grep -q ":$port " || ss -tuln 2>/dev/null | grep -q ":$port "; then
+            show_progress "Puerto $port ($service): ✓"
+        else
+            show_warning "Puerto $port ($service) no está en uso"
+        fi
+    done
+}
+
+# Verificar configuración de monitoreo
+check_monitoring_config() {
+    show_info "Verificando configuración de monitoreo..."
+
+    cd "$PROJECT_ROOT"
+
+    run_check "Configuración de Prometheus existe"
+    if [ -f "monitoring/prometheus/prometheus.yml" ]; then
+        show_progress "Configuración de Prometheus: ✓"
+    else
+        show_warning "Configuración de Prometheus no encontrada"
+    fi
+
+    run_check "Reglas de alertas existen"
+    if [ -f "monitoring/prometheus/alert_rules.yml" ]; then
+        show_progress "Reglas de alertas: ✓"
+    else
+        show_warning "Reglas de alertas no encontradas"
+    fi
+}
+
+# Verificar health checks
+check_health_endpoints() {
+    show_info "Verificando endpoints de health check..."
+
+    # Esta verificación solo funciona si los servicios están ejecutándose
+    services=(
+        "8080:API Gateway"
+        "8081:Auth Service"
+        "8082:Station Service"
+        "8083:Coupon Service"
+        "8084:Raffle Service"
+    )
+
+    for service_info in "${services[@]}"; do
+        port=$(echo "$service_info" | cut -d: -f1)
+        service=$(echo "$service_info" | cut -d: -f2)
+
+        run_check "Health check $service (puerto $port)"
+        if curl -s -f "http://localhost:$port/health" &> /dev/null; then
+            show_progress "Health check $service: ✓"
+        else
+            show_warning "Health check $service no disponible (servicio puede no estar ejecutándose)"
+        fi
+    done
+}
+
+# Mostrar resumen
+show_summary() {
+    echo ""
+    echo -e "${BLUE}📊 Resumen de validación:${NC}"
+    echo -e "   • Total de verificaciones: $TOTAL_CHECKS"
+    echo -e "   • Exitosas: ${GREEN}$PASSED_CHECKS${NC}"
+    echo -e "   • Advertencias: ${YELLOW}$WARNING_CHECKS${NC}"
+    echo -e "   • Fallidas: ${RED}$FAILED_CHECKS${NC}"
+    echo ""
+
+    if [ $FAILED_CHECKS -eq 0 ]; then
+        if [ $WARNING_CHECKS -eq 0 ]; then
+            echo -e "${GREEN}🎉 ¡Toda la infraestructura está funcionando perfectamente!${NC}"
+        else
+            echo -e "${YELLOW}⚠️  La infraestructura está funcionando con algunas advertencias.${NC}"
+        fi
+    else
+        echo -e "${RED}❌ Se encontraron problemas en la infraestructura.${NC}"
+        if [ "$FIX_ISSUES" = false ]; then
+            echo -e "${BLUE}💡 Ejecuta con --fix-issues para intentar corregir automáticamente.${NC}"
+        fi
+    fi
+
+    echo ""
+    echo -e "${BLUE}🔧 Para solucionar problemas manualmente:${NC}"
+    echo -e "   • Reiniciar servicios: docker-compose -f docker-compose.simple.yml restart"
+    echo -e "   • Ver logs: docker-compose -f docker-compose.simple.yml logs [servicio]"
+    echo -e "   • Reconfigurar: ./setup-infrastructure.sh"
+    echo ""
+}
+
+# Función principal
+main() {
+    check_environment_variables
+    check_docker_services
+    check_database_connectivity
+    check_redis_connectivity
+    check_rabbitmq_connectivity
+    check_security_keys
+    check_directories
+    check_ports
+    check_monitoring_config
+    check_health_endpoints
+    show_summary
+
+    # Código de salida basado en resultados
+    if [ $FAILED_CHECKS -gt 0 ]; then
+        exit 1
+    elif [ $WARNING_CHECKS -gt 0 ]; then
+        exit 2
+    else
+        exit 0
+    fi
+}
+
+# Ejecutar función principal
 main "$@"

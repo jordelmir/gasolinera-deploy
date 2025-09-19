@@ -1,0 +1,108 @@
+server:
+  port: 8097
+
+spring:
+  application:
+    name: message-improver
+  profiles:
+    active: dev
+
+# Gemini AI Configuration
+gemini:
+  api:
+    key: ${GEMINI_API_KEY:AIzaSyBInSfm7AbIJhZBkDPyNSXGx706XSebWZc}
+    base-url: https://generativelanguage.googleapis.com/v1beta
+    model: gemini-1.5-flash
+    timeout: 30000 # 30 seconds
+    max-retries: 3
+  generation:
+    temperature: 0.7
+    max-output-tokens: 1000
+    top-p: 0.8
+    top-k: 40
+
+# Message Improvement Configuration
+app:
+  message:
+    improvement:
+      max-message-length: 5000
+      min-message-length: 10
+      cache-ttl-minutes: 60
+      enable-caching: true
+      default-confidence-threshold: 0.5
+      supported-languages:
+        - es
+        - en
+      supported-tones:
+        - professional
+        - casual
+        - technical
+        - marketing
+        - customer-service
+      supported-audiences:
+        - developers
+        - customers
+        - employees
+        - managers
+        - administrators
+
+# Observability
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+
+# Logging
+logging:
+  level:
+    com.gasolinerajsm: DEBUG
+    org.springframework.web: INFO
+  pattern:
+    console: '%d{yyyy-MM-dd HH:mm:ss} - %msg%n'
+    file: '%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n'
+
+---
+spring:
+  config:
+    activate:
+      on-profile: dev
+
+logging:
+  level:
+    root: INFO
+    com.gasolinerajsm: DEBUG
+
+app:
+  message:
+    improvement:
+      enable-caching: false # Disable caching in dev for testing
+
+---
+spring:
+  config:
+    activate:
+      on-profile: prod
+
+gemini:
+  api:
+    key: ${GEMINI_API_KEY}
+    timeout: 15000 # Shorter timeout in production
+
+logging:
+  level:
+    root: WARN
+    com.gasolinerajsm: INFO
+
+app:
+  message:
+    improvement:
+      enable-caching: true
+      cache-ttl-minutes: 120 # Longer cache in production

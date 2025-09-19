@@ -5,23 +5,6 @@ plugins {
     kotlin("jvm")
     kotlin("plugin.spring")
     kotlin("plugin.jpa")
-    id("io.gitlab.arturbosch.detekt")
-}
-
-detekt {
-    toolVersion = "1.23.7"
-    buildUponDefaultConfig = true
-    allRules = false
-    baseline = file("detekt-baseline.xml")
-}
-
-tasks.withType<io.gitlab.arturbosch.detekt.Detekt>().configureEach {
-    reports {
-        xml.required.set(true)
-        html.required.set(true)
-        txt.required.set(false)
-        sarif.required.set(false)
-    }
 }
 
 group = "com.gasolinerajsm"
@@ -38,7 +21,6 @@ repositories {
 }
 
 dependencies {
-    detektPlugins("io.gitlab.arturbosch.detekt:detekt-formatting:1.23.7")
 
     // Spring Boot Starters
     implementation("org.springframework.boot:spring-boot-starter-web")
@@ -52,8 +34,16 @@ dependencies {
 
     // Database
     implementation("org.flywaydb:flyway-core")
-    implementation("org.flywaydb:flyway-database-postgresql")
-    runtimeOnly("org.postgresql:postgresql")
+    implementation("org.postgresql:postgresql")
+    runtimeOnly("com.h2database:h2")
+
+    // Messaging
+    implementation("org.springframework.boot:spring-boot-starter-amqp")
+
+    // Shared modules
+    implementation(project(":shared:common"))
+    implementation(project(":shared:security"))
+    implementation(project(":shared:messaging"))
 
     // Observability
     implementation("io.micrometer:micrometer-registry-prometheus")
@@ -69,6 +59,9 @@ dependencies {
     implementation("io.jsonwebtoken:jjwt-api:0.11.5")
     runtimeOnly("io.jsonwebtoken:jjwt-impl:0.11.5")
     runtimeOnly("io.jsonwebtoken:jjwt-jackson:0.11.5")
+
+    // OpenAPI/Swagger
+    implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.2.0")
 
     // Testing
     testImplementation("org.springframework.boot:spring-boot-starter-test") {

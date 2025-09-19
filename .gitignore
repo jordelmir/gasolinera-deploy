@@ -1,123 +1,218 @@
+# 🚀 GASOLINERA JSM - GITIGNORE PROFESIONAL
+# =====================================================
 
+# ===== JAVA / KOTLIN / GRADLE =====
+# Build outputs
+build/
+target/
+out/
+*.jar
+*.war
+*.ear
+*.class
+
+# Gradle
+.gradle/
+gradle-app.setting
+!gradle-wrapper.jar
+!gradle-wrapper.properties
+gradle-8.8-bin.zip
+
+# Maven
+.mvn/
+mvnw
+mvnw.cmd
+
+# ===== NODE.JS / FRONTEND =====
 # Dependencies
 node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+.pnpm-debug.log*
 
-# Build outputs
-/dist
-/build
-/nx_build_output.txt
-/npm_install_output.txt
-.nx/
+# Next.js
+.next/
+out/
+dist/
 
-# Gradle
-.gradle/
-build/
-gradle-wrapper.jar
-gradle-wrapper.properties
+# React Native
+.expo/
+.expo-shared/
 
-# IDE
-.vscode/settings.json
-.idea/
-*.swp
-*.swo
-*~
+# Nuxt.js
+.nuxt/
 
-# OS
-.DS_Store
-Thumbs.db
+# Vite
+dist-ssr/
+*.local
 
-# Environment variables
-.env
+# ===== ENVIRONMENT & CONFIG =====
+# Environment variables (keep examples)
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
+.env.*.local
 
-# Logs
-logs
-*.log
+# Secrets (keep examples)
+*.pem
+*.key
+!ops/key-management/*.pem
+!ops/key-management/*.key
 
-# Runtime data
-pids
-*.pid
-*.seed
-*.pid.lock
-
-# Coverage directory used by tools like istanbul
-coverage/
-*.lcov
-
-# nyc test coverage
-.nyc_output
-
-# Dependency directories
-jspm_packages/
-
-# Optional npm cache directory
-.npm
-
-# Optional eslint cache
-.eslintcache
-
-# Microbundle cache
-.rpt2_cache/
-.rts2_cache_cjs/
-.rts2_cache_es/
-.rts2_cache_umd/
-
-# Optional REPL history
-.node_repl_history
-
-# Output of 'npm pack'
-*.tgz
-
-# Yarn Integrity file
-.yarn-integrity
-
-# parcel-bundler cache (https://parceljs.org/)
-.cache
-.parcel-cache
-
-# Next.js build output
-.next
-
-# Nuxt.js build / generate output
-.nuxt
-dist
-
-# Gatsby files
-.cache/
-public
-
-# Storybook build outputs
-.out
-.storybook-out
-
-# Temporary folders
-tmp/
-temp/
-
-# Docker
-.dockerignore
-
-# Backup files
-*.backup
-*.bak
-backups/
-
-# Database
+# ===== DATABASES & CACHE =====
+# Database files
 *.db
 *.sqlite
 *.sqlite3
 
+# Cache directories
+.cache/
+.nx/cache/
+.nx/workspace-data/
+.parcel-cache/
 
+# ===== DOCKER & CONTAINERS =====
+# Docker
+.dockerignore
+docker-compose.override.yml
 
+# ===== IDE & EDITORS =====
+# IntelliJ IDEA
+.idea/
+*.iml
+*.ipr
+*.iws
 
+# VS Code
+.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
 
-.nx/cache
-.nx/workspace-data
-.cursor/rules/nx-rules.mdc
-.github/instructions/nx.instructions.md
+# Eclipse
+.project
+.classpath
+.settings/
+.metadata/
+
+# ===== OPERATING SYSTEM =====
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Linux
+*~
+.nfs*
+
+# ===== LOGS & RUNTIME =====
+# Application logs
+logs/
+*.log
+log/
+
+# Runtime data
+tmp/
+temp/
+.tmp/
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# ===== TESTING & COVERAGE =====
+# Test coverage
+coverage/
+.nyc_output/
+*.lcov
+.coverage/
+
+# Test results
+test-results/
+junit.xml
+
+# ===== MONITORING & METRICS =====
+# Prometheus data
+data/prometheus/
+data/grafana/
+
+# Application data
+data/postgres/
+data/redis/
+data/rabbitmq/
+
+# ===== DEPLOYMENT & CI/CD =====
+# Terraform
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+
+# Kubernetes
+*.kubeconfig
+
+# ===== PACKAGE MANAGERS =====
+# NPM
+package-lock.json
+npm-debug.log*
+
+# Yarn
+yarn.lock
+yarn-debug.log*
+yarn-error.log*
+
+# PNPM
+pnpm-lock.yaml
+
+# ===== MISC =====
+# Backup files
+*.bak
+*.backup
+*.swp
+*.swo
+
+# Archive files
+*.zip
+*.tar.gz
+*.rar
+
+# Large media files (uncomment if needed)
+# *.mp4
+# *.avi
+# *.mov
+# *.png
+# *.jpg
+# *.jpeg
+# *.gif
+
+# ===== KEEP THESE IMPORTANT FILES =====
+# Keep essential configuration
+!gradle/wrapper/gradle-wrapper.jar
+!gradle/wrapper/gradle-wrapper.properties
+!.env.example
+!.env.development
+!docker-compose.yml
+!docker-compose.simple.yml
+!render.yaml
+!vercel.json
+
+# Keep documentation
+!README*.md
+!CHANGELOG.md
+!LICENSE
+!CONTRIBUTING.md
+
+# Keep deployment configs
+!.github/workflows/
+!scripts/
+!config/
+!monitoring/

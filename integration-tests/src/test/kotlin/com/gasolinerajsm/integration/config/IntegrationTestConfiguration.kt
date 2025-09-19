@@ -7,6 +7,7 @@ import org.springframework.web.client.RestTemplate
 import org.springframework.boot.web.client.RestTemplateBuilder
 import org.springframework.http.client.HttpComponentsClientHttpRequestFactory
 import java.time.Duration
+import java.util.function.Supplier
 
 /**
  * Test configuration for integration tests
@@ -20,7 +21,7 @@ class IntegrationTestConfiguration {
         return RestTemplateBuilder()
             .setConnectTimeout(Duration.ofSeconds(30))
             .setReadTimeout(Duration.ofSeconds(30))
-            .requestFactory { HttpComponentsClientHttpRequestFactory() }
+            .requestFactory(Supplier { HttpComponentsClientHttpRequestFactory() })
             .build()
     }
 }

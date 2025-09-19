@@ -1,5 +1,6 @@
 package com.gasolinerajsm.adengine.service
 
+import com.gasolinerajsm.adengine.events.AdCompletionEvent
 import org.slf4j.LoggerFactory
 import org.springframework.amqp.rabbit.core.RabbitTemplate
 import org.springframework.context.event.EventListener

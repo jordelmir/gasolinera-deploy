@@ -1,7 +1,11 @@
 package com.gasolinerajsm.adengine.controller
 
 import com.gasolinerajsm.adengine.dto.*
-import com.gasolinerajsm.adengine.model.*
+import com.gasolinerajsm.adengine.domain.model.AdEngagement
+import com.gasolinerajsm.adengine.domain.model.EngagementStatus
+import com.gasolinerajsm.adengine.domain.model.EngagementType
+import com.gasolinerajsm.adengine.domain.valueobject.EngagementId
+import com.gasolinerajsm.adengine.domain.valueobject.RaffleEntryId
 import com.gasolinerajsm.adengine.service.*
 import jakarta.validation.Valid
 import org.slf4j.LoggerFactory
@@ -34,7 +38,7 @@ class EngagementController(
 
         return try {
             val engagement = engagementTrackingService.trackView(
-                engagementId = request.engagementId,
+                engagementId = EngagementId.fromLong(request.engagementId),
                 viewDurationSeconds = request.viewDurationSeconds
             )
 
@@ -68,7 +72,7 @@ class EngagementController(
 
         return try {
             val engagement = engagementTrackingService.trackClick(
-                engagementId = request.engagementId,
+                engagementId = EngagementId.fromLong(request.engagementId),
                 clickThroughUrl = request.clickThroughUrl
             )
 
@@ -102,8 +106,8 @@ class EngagementController(
 
         return try {
             val engagement = engagementTrackingService.trackInteraction(
-                engagementId = request.engagementId,
-                interactionType = request.interactionType
+                engagementId = EngagementId.fromLong(request.engagementId),
+                interactionType = request.interactionType ?: "GENERAL"
             )
 
             ResponseEntity.ok(
@@ -136,7 +140,7 @@ class EngagementController(
 
         return try {
             val engagement = engagementTrackingService.trackCompletion(
-                engagementId = request.engagementId,
+                engagementId = EngagementId.fromLong(request.engagementId),
                 completionPercentage = request.completionPercentage,
                 viewDurationSeconds = request.viewDurationSeconds
             )
@@ -184,7 +188,7 @@ class EngagementController(
 
         return try {
             val engagement = engagementTrackingService.updateEngagementProgress(
-                engagementId = request.engagementId,
+                engagementId = EngagementId.fromLong(request.engagementId),
                 viewDurationSeconds = request.viewDurationSeconds,
                 completionPercentage = request.completionPercentage,
                 interactions = request.interactions,
@@ -221,7 +225,7 @@ class EngagementController(
         logger.debug("Tracking skip for engagement $engagementId")
 
         return try {
-            val engagement = engagementTrackingService.trackSkip(engagementId)
+            val engagement = engagementTrackingService.trackSkip(EngagementId.fromLong(engagementId))
 
             ResponseEntity.ok(
                 EngagementTrackingResponse(
@@ -253,7 +257,7 @@ class EngagementController(
 
         return try {
             val engagement = engagementTrackingService.trackError(
-                engagementId = request.engagementId,
+                engagementId = EngagementId.fromLong(request.engagementId),
                 errorMessage = request.errorMessage,
                 errorCode = request.errorCode
             )
@@ -288,10 +292,10 @@ class EngagementController(
 
         return try {
             val engagement = engagementTrackingService.awardTickets(
-                engagementId = request.engagementId,
+                engagementId = EngagementId.fromLong(request.engagementId),
                 baseTickets = request.baseTickets,
                 bonusTickets = request.bonusTickets,
-                raffleEntryId = request.raffleEntryId
+                raffleEntryId = request.raffleEntryId?.let { RaffleEntryId.fromLong(it) }
             )
 
             ResponseEntity.ok(
@@ -471,61 +475,61 @@ class EngagementController(
 // Extension functions for DTO conversion
 private fun AdEngagement.toDto(): AdEngagementDto {
     return AdEngagementDto(
-        id = this.id,
-        userId = this.userId,
-        advertisementId = this.advertisement.id,
-        advertisementTitle = this.advertisement.title,
-        sessionId = this.sessionId,
+        id = this.id.toLong(),
+        userId = this.userId.toLong(),
+        advertisementId = this.advertisementId.toLong(),
+        advertisementTitle = "Advertisement ${this.advertisementId.toLong()}", // Placeholder
+        sessionId = this.sessionId?.value,
         engagementType = this.engagementType,
         status = this.status,
-        startedAt = this.startedAt,
-        completedAt = this.completedAt,
-        viewDurationSeconds = this.viewDurationSeconds,
-        completionPercentage = this.completionPercentage,
-        clicked = this.clicked,
-        clickedAt = this.clickedAt,
-        clickThroughUrl = this.clickThroughUrl,
-        stationId = this.stationId,
-        deviceType = this.deviceType,
-        deviceId = this.deviceId,
-        ipAddress = this.ipAddress,
-        userAgent = this.userAgent,
-        locationLatitude = this.locationLatitude,
-        locationLongitude = this.locationLongitude,
-        locationAccuracyMeters = this.locationAccuracyMeters,
-        baseTicketsEarned = this.baseTicketsEarned,
-        bonusTicketsEarned = this.bonusTicketsEarned,
-        totalTicketsEarned = this.totalTicketsEarned,
-        ticketsAwarded = this.ticketsAwarded,
-        ticketsAwardedAt = this.ticketsAwardedAt,
-        raffleEntryCreated = this.raffleEntryCreated,
-        raffleEntryId = this.raffleEntryId,
-        costCharged = this.costCharged,
-        billingEvent = this.billingEvent,
-        interactionsCount = this.interactionsCount,
-        pauseCount = this.pauseCount,
-        replayCount = this.replayCount,
-        skipAttempted = this.skipAttempted,
-        skipAllowed = this.skipAllowed,
-        skippedAt = this.skippedAt,
-        errorOccurred = this.errorOccurred,
-        errorMessage = this.errorMessage,
-        errorCode = this.errorCode,
-        referrerUrl = this.referrerUrl,
-        campaignContext = this.campaignContext,
-        placementContext = this.placementContext,
-        metadata = this.metadata,
-        notes = this.notes,
+        startedAt = this.timestamps.startedAt,
+        completedAt = this.timestamps.completedAt,
+        viewDurationSeconds = this.interactionData.viewDurationSeconds,
+        completionPercentage = this.interactionData.completionPercentage,
+        clicked = this.interactionData.clicked,
+        clickedAt = this.interactionData.clickedAt,
+        clickThroughUrl = this.interactionData.clickThroughUrl,
+        stationId = null, // Not in current model
+        deviceType = this.deviceInfo?.deviceType?.name,
+        deviceId = this.deviceInfo?.deviceId,
+        ipAddress = null, // Not in current model
+        userAgent = this.deviceInfo?.userAgent,
+        locationLatitude = this.locationData?.latitude,
+        locationLongitude = this.locationData?.longitude,
+        locationAccuracyMeters = this.locationData?.accuracyMeters,
+        baseTicketsEarned = this.rewardData.baseTicketsEarned,
+        bonusTicketsEarned = this.rewardData.bonusTicketsEarned,
+        totalTicketsEarned = this.rewardData.totalTicketsEarned,
+        ticketsAwarded = this.rewardData.ticketsAwarded,
+        ticketsAwardedAt = this.rewardData.ticketsAwardedAt,
+        raffleEntryCreated = this.rewardData.raffleEntryCreated,
+        raffleEntryId = this.rewardData.raffleEntryId?.toLong(),
+        costCharged = this.rewardData.costCharged,
+        billingEvent = this.rewardData.billingEvent?.name,
+        interactionsCount = this.interactionData.interactionsCount,
+        pauseCount = this.interactionData.pauseCount,
+        replayCount = this.interactionData.replayCount,
+        skipAttempted = this.interactionData.skipAttempted,
+        skipAllowed = this.interactionData.skipAllowed,
+        skippedAt = this.interactionData.skippedAt,
+        errorOccurred = this.interactionData.errorOccurred,
+        errorMessage = this.interactionData.errorMessage,
+        errorCode = this.interactionData.errorCode,
+        referrerUrl = this.interactionData.referrerUrl,
+        campaignContext = this.interactionData.campaignContext,
+        placementContext = this.interactionData.placementContext,
+        metadata = this.metadata.value(), // Convert to string
+        notes = null, // Not in current model
         createdAt = this.createdAt,
         updatedAt = this.updatedAt,
         isCompleted = this.isCompleted(),
         wasSkipped = this.wasSkipped(),
         hadError = this.hadError(),
-        qualifiesForRewards = this.qualifiesForRewards(),
-        hasTicketsAwarded = this.hasTicketsAwarded(),
-        engagementDurationSeconds = this.getEngagementDurationSeconds(),
-        engagementDurationMinutes = this.getEngagementDurationMinutes(),
-        engagementQualityScore = this.getEngagementQualityScore(),
+        qualifiesForRewards = this.rewardData.qualifiesForRewards(),
+        hasTicketsAwarded = this.rewardData.hasTicketsAwarded(),
+        engagementDurationSeconds = this.timestamps.getDurationSeconds(),
+        engagementDurationMinutes = this.timestamps.getDurationSeconds()?.div(60.0),
+        engagementQualityScore = this.getEngagementQualityScore().toDouble(),
         formattedLocation = this.getFormattedLocation(),
         hasLocationData = this.hasLocationData()
     )

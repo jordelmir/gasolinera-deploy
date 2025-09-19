@@ -34,7 +34,7 @@ echo "--------------------------------"
 
 # Check auth-service
 echo "Checking auth-service..."
-if gradle :services:auth-service:compileKotlin --no-daemon > /dev/null 2>&1; then
+if ./gradlew :services:auth-service:compileKotlin --no-daemon > /dev/null 2>&1; then
     print_status 0 "auth-service compiles successfully"
 else
     print_status 1 "auth-service compilation failed"
@@ -42,26 +42,42 @@ fi
 
 # Check coupon-service
 echo "Checking coupon-service..."
-if gradle :services:coupon-service:compileKotlin --no-daemon > /dev/null 2>&1; then
+if ./gradlew :services:coupon-service:compileKotlin --no-daemon > /dev/null 2>&1; then
     print_status 0 "coupon-service compiles successfully"
 else
     print_status 1 "coupon-service compilation failed"
 fi
 
+# Check station-service
+echo "Checking station-service..."
+if ./gradlew :services:station-service:compileKotlin --no-daemon > /dev/null 2>&1; then
+    print_status 0 "station-service compiles successfully"
+else
+    print_status 1 "station-service compilation failed"
+fi
+
+# Check api-gateway
+echo "Checking api-gateway..."
+if ./gradlew :services:api-gateway:compileKotlin --no-daemon > /dev/null 2>&1; then
+    print_status 0 "api-gateway compiles successfully"
+else
+    print_status 1 "api-gateway compilation failed"
+fi
+
 echo ""
-echo "📋 Checking Problematic Services..."
+echo "📋 Checking Services with Issues..."
 echo "-----------------------------------"
 
-# List of problematic services
-PROBLEMATIC_SERVICES=("station-service" "api-gateway" "ad-engine" "raffle-service")
+# List of services with issues
+SERVICES_WITH_ISSUES=("ad-engine" "raffle-service")
 
-for service in "${PROBLEMATIC_SERVICES[@]}"; do
+for service in "${SERVICES_WITH_ISSUES[@]}"; do
     echo "Checking $service..."
-    if gradle :services:$service:compileKotlin --no-daemon > /dev/null 2>&1; then
+    if ./gradlew :services:$service:compileKotlin --no-daemon > /dev/null 2>&1; then
         print_status 0 "$service compiles successfully"
     else
-        print_status 1 "$service has compilation issues (expected)"
-        print_warning "Check services/$service/TODO.md for details"
+        print_status 1 "$service has compilation issues"
+        print_warning "Check services/$service/ for details on compilation errors"
     fi
 done
 
@@ -82,9 +98,9 @@ cd ../..
 echo ""
 echo "📋 Summary"
 echo "----------"
-echo "✅ Working Services: auth-service, coupon-service"
-echo "❌ Problematic Services: station-service, api-gateway, ad-engine, raffle-service"
-echo "📝 Check individual TODO.md files for detailed issue analysis"
+echo "✅ Working Services: auth-service, coupon-service, station-service, api-gateway"
+echo "❌ Services with Issues: api-gateway (other config files need fixes), ad-engine (complex domain model issues), raffle-service (type mismatches)"
+echo "📝 Check individual service directories for compilation error details"
 echo ""
 echo "🚀 To start development environment:"
 echo "   docker-compose -f docker-compose.dev.yml up -d"

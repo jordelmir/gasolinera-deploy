@@ -60,9 +60,10 @@ data class Raffle(
 
             raffle.addDomainEvent(
                 RaffleCreatedEvent(
-                    raffleId = raffle.id,
+                    aggregateId = raffle.id.toString(),
+                    raffleId = raffle.id.toString(),
                     name = raffle.name,
-                    raffleType = raffle.raffleType,
+                    raffleType = raffle.raffleType.toString(),
                     schedule = raffle.schedule,
                     prizePoolValue = raffle.prizePool.totalValue,
                     maxParticipants = raffle.participationRules.maxParticipants,
@@ -143,7 +144,8 @@ data class Raffle(
 
         activatedRaffle.addDomainEvent(
             RaffleActivatedEvent(
-                raffleId = id,
+                aggregateId = id.toString(),
+                raffleId = id.toString(),
                 name = name,
                 registrationStart = schedule.registrationStart,
                 registrationEnd = schedule.registrationEnd,
@@ -209,7 +211,8 @@ data class Raffle(
 
         completedRaffle.addDomainEvent(
             RaffleDrawCompletedEvent(
-                raffleId = id,
+                aggregateId = id.toString(),
+                raffleId = id.toString(),
                 name = name,
                 drawResults = drawResults,
                 totalParticipants = statistics.currentParticipants,

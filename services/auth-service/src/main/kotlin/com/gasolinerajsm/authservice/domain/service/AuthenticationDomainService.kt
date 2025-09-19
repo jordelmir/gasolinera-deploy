@@ -2,12 +2,14 @@ package com.gasolinerajsm.authservice.domain.service
 
 import com.gasolinerajsm.authservice.domain.model.User
 import com.gasolinerajsm.authservice.domain.valueobject.PhoneNumber
+import org.springframework.stereotype.Service
 import java.time.LocalDateTime
 
 /**
  * Authentication Domain Service
  * Contains complex business logic that doesn't belong to a single entity
  */
+@Service
 class AuthenticationDomainService {
 
     companion object {

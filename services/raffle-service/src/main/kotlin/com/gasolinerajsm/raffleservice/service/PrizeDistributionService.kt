@@ -1,5 +1,6 @@
 package com.gasolinerajsm.raffleservice.service
 
+import com.gasolinerajsm.raffleservice.model.RaffleType
 import com.gasolinerajsm.raffleservice.model.*
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service

@@ -39,7 +39,7 @@ class RaffleEventHandler(
             )
 
             if (!validationResult.isValid) {
-                logger.error("Ticket validation failed: {}", validationResult.reason)
+                logger.error("Ticket validation failed: {}", validationResult.errorMessage)
 
                 // Publish audit event for failed validation
                 eventPublisher.publishAuditEvent(
@@ -49,7 +49,7 @@ class RaffleEventHandler(
                     auditType = AuditType.SYSTEM_EVENT,
                     userId = event.userId,
                     success = false,
-                    errorMessage = validationResult.reason,
+                    errorMessage = validationResult.errorMessage,
                     source = "raffle-service"
                 )
                 return

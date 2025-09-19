@@ -19,7 +19,7 @@ class AdSelectionService(
 
     fun selectAd(request: AdSelectionRequest): AdCreativeResponse {
         val activeCampaigns = campaignRepository.findActiveCampaignsForStation(
-            request.stationId
+            request.stationId.toString()
         )
 
         return if (activeCampaigns.isNotEmpty()) {

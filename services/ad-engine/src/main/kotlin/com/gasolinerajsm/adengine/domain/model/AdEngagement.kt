@@ -1,10 +1,10 @@
 package com.gasolinerajsm.adengine.domain.model
 
-import com.gasolinerajsm.adengine.domain.event.DomainEvent
-import com.gasolinerajsm.adengine.domain.event.EngagementStartedEvent
-import com.gasolinerajsm.adengine.domain.event.EngagementCompletedEvent
-import com.gasolinerajsm.adengine.domain.event.TicketsAwardedEvent
 import com.gasolinerajsm.adengine.domain.valueobject.*
+import com.gasolinerajsm.adengine.events.DomainEvent
+import com.gasolinerajsm.adengine.events.EngagementStartedEvent
+import com.gasolinerajsm.adengine.events.EngagementCompletedEvent
+import com.gasolinerajsm.adengine.events.TicketsAwardedEvent
 import java.math.BigDecimal
 import java.time.LocalDateTime
 
@@ -26,7 +26,7 @@ data class AdEngagement(
     val rewardData: RewardData = RewardData.initial(),
     val billingData: BillingData? = null,
     val errorInfo: ErrorInfo? = null,
-    val metadata: EngagementMetadata = EngagementMetadata.empty(),
+    val metadata: EngagementMetadata = EngagementMetadata(),
     val createdAt: LocalDateTime = LocalDateTime.now(),
     val updatedAt: LocalDateTime = LocalDateTime.now(),
     private val domainEvents: MutableList<DomainEvent> = mutableListOf()
@@ -43,7 +43,7 @@ data class AdEngagement(
             engagementType: EngagementType,
             locationData: LocationData? = null,
             deviceInfo: DeviceInfo? = null,
-            metadata: EngagementMetadata = EngagementMetadata.empty()
+            metadata: EngagementMetadata = EngagementMetadata()
         ): AdEngagement {
             val engagement = AdEngagement(
                 id = EngagementId.generate(),
@@ -60,6 +60,7 @@ data class AdEngagement(
 
             engagement.addDomainEvent(
                 EngagementStartedEvent(
+                    aggregateId = engagement.id.toString(),
                     engagementId = engagement.id,
                     userId = engagement.userId,
                     advertisementId = engagement.advertisementId,
@@ -125,6 +126,7 @@ data class AdEngagement(
 
         completedEngagement.addDomainEvent(
             EngagementCompletedEvent(
+                aggregateId = id.toString(),
                 engagementId = id,
                 userId = userId,
                 advertisementId = advertisementId,
@@ -146,6 +148,7 @@ data class AdEngagement(
     fun click(clickThroughUrl: String? = null): AdEngagement {
         return this.copy(
             interactionData = interactionData.recordClick(clickThroughUrl),
+            status = EngagementStatus.INTERACTED,
             updatedAt = LocalDateTime.now()
         )
     }
@@ -161,6 +164,7 @@ data class AdEngagement(
         return this.copy(
             status = EngagementStatus.SKIPPED,
             timestamps = timestamps.markSkipped(),
+            interactionData = interactionData.recordSkip(),
             updatedAt = LocalDateTime.now()
         )
     }
@@ -171,12 +175,7 @@ data class AdEngagement(
     fun error(errorMessage: String, errorCode: String? = null): AdEngagement {
         return this.copy(
             status = EngagementStatus.ERROR,
-            errorInfo = ErrorInfo(
-                errorOccurred = true,
-                errorMessage = errorMessage,
-                errorCode = errorCode,
-                errorTimestamp = LocalDateTime.now()
-            ),
+            interactionData = interactionData.recordError(errorMessage, errorCode),
             updatedAt = LocalDateTime.now()
         )
     }
@@ -206,6 +205,7 @@ data class AdEngagement(
 
         updatedEngagement.addDomainEvent(
             TicketsAwardedEvent(
+                aggregateId = id.toString(),
                 engagementId = id,
                 userId = userId,
                 advertisementId = advertisementId,
@@ -239,10 +239,9 @@ data class AdEngagement(
      */
     fun setBilling(cost: BigDecimal, event: BillingEvent): AdEngagement {
         return this.copy(
-            billingData = BillingData(
+            rewardData = rewardData.copy(
                 costCharged = cost,
-                billingEvent = event,
-                billedAt = LocalDateTime.now()
+                billingEvent = event
             ),
             updatedAt = LocalDateTime.now()
         )

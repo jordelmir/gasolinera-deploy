@@ -20,7 +20,7 @@ data class RaffleDto(
     val description: String? = null,
 
     val status: RaffleStatus = RaffleStatus.DRAFT,
-    val raffleType: RaffleType = RaffleType.REGULAR,
+    val raffleType: RaffleType = RaffleType.WEEKLY,
 
     @field:NotNull(message = "Registration start date is required")
     val registrationStart: LocalDateTime,
@@ -85,7 +85,7 @@ data class CreateRaffleRequest(
     @field:Size(max = 1000, message = "Description must not exceed 1000 characters")
     val description: String? = null,
 
-    val raffleType: RaffleType = RaffleType.REGULAR,
+    val raffleType: RaffleType = RaffleType.WEEKLY,
 
     @field:NotNull(message = "Registration start date is required")
     val registrationStart: LocalDateTime,
@@ -128,6 +128,8 @@ data class UpdateRaffleRequest(
 
     @field:Size(max = 1000, message = "Description must not exceed 1000 characters")
     val description: String? = null,
+
+    val raffleType: RaffleType = RaffleType.WEEKLY,
 
     @field:NotNull(message = "Registration start date is required")
     val registrationStart: LocalDateTime,
@@ -182,7 +184,7 @@ data class RaffleBasicInfo(
     val id: Long,
     val name: String,
     val status: RaffleStatus,
-    val type: RaffleType,
+    val type: com.gasolinerajsm.raffleservice.model.RaffleType,
     val currentParticipants: Int,
     val maxParticipants: Int?,
     val registrationStart: LocalDateTime,

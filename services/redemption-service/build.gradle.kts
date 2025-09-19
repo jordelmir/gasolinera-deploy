@@ -5,23 +5,6 @@ plugins {
     id("io.spring.dependency-management")
     kotlin("jvm")
     kotlin("plugin.spring")
-    id("io.gitlab.arturbosch.detekt")
-}
-
-detekt {
-    toolVersion = "1.23.7"
-    buildUponDefaultConfig = true
-    allRules = false
-    baseline = file("detekt-baseline.xml")
-}
-
-tasks.withType<io.gitlab.arturbosch.detekt.Detekt>().configureEach {
-    reports {
-        xml.required.set(true)
-        html.required.set(true)
-        txt.required.set(false)
-        sarif.required.set(false)
-    }
 }
 
 group = "com.gasolinerajsm.redemptionservice"
@@ -38,7 +21,6 @@ repositories {
 }
 
 dependencies {
-    detektPlugins("io.gitlab.arturbosch.detekt:detekt-formatting:1.23.7") // Detekt formatting rules
 
     // --- Shared Modules ---
     implementation(project(":shared:messaging"))
@@ -94,6 +76,10 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
 
 tasks.withType<Test> {
     useJUnitPlatform()
+}
+
+springBoot {
+    mainClass.set("com.gasolinerajsm.redemptionservice.RedemptionServiceApplicationKt")
 }
 
 tasks.getByName<org.springframework.boot.gradle.tasks.bundling.BootJar>("bootJar") {

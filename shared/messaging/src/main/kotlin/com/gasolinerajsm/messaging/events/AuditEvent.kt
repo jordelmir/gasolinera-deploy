@@ -18,6 +18,7 @@ data class AuditEvent(
     val stationId: Long?,
     val success: Boolean,
     val errorMessage: String?,
+    val reason: String? = null,
     val details: Map<String, Any> = emptyMap(),
 
     @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss.SSS")
@@ -56,6 +57,10 @@ data class AuditEvent(
         AuditType.DATA_IMPORT -> "audit.data.import"
         AuditType.CONFIGURATION_CHANGE -> "audit.config.change"
         AuditType.PAYMENT_PROCESSED -> "audit.payment.processed"
+        AuditType.USER_ACTION -> "audit.user.action"
+        AuditType.SYSTEM_EVENT -> "audit.system.event"
+        AuditType.TRANSACTION -> "audit.transaction.completed"
+        AuditType.DATA_ACCESS -> "audit.data.access"
     }
 
     override fun getAuditLevel(): AuditLevel = when (auditType) {
@@ -70,6 +75,10 @@ data class AuditEvent(
         AuditType.TICKET_GENERATED, AuditType.TICKET_MULTIPLIED -> AuditLevel.INFO
         AuditType.PRIZE_AWARDED -> AuditLevel.INFO
         AuditType.PAYMENT_PROCESSED -> AuditLevel.INFO
+        AuditType.USER_ACTION -> AuditLevel.INFO
+        AuditType.SYSTEM_EVENT -> AuditLevel.INFO
+        AuditType.TRANSACTION -> AuditLevel.INFO
+        AuditType.DATA_ACCESS -> AuditLevel.DEBUG
     }
 
     override fun shouldAudit(): Boolean = true

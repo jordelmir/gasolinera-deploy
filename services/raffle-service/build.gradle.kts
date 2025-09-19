@@ -5,23 +5,6 @@ plugins {
     id("io.spring.dependency-management")
     kotlin("jvm")
     kotlin("plugin.spring")
-    id("io.gitlab.arturbosch.detekt")
-}
-
-detekt {
-    toolVersion = "1.23.7"
-    buildUponDefaultConfig = true
-    allRules = false
-    baseline = file("detekt-baseline.xml")
-}
-
-tasks.withType<io.gitlab.arturbosch.detekt.Detekt>().configureEach {
-    reports {
-        xml.required.set(true)
-        html.required.set(true)
-        txt.required.set(false)
-        sarif.required.set(false)
-    }
 }
 
 group = "com.gasolinerajsm.raffleservice"
@@ -38,7 +21,6 @@ repositories {
 }
 
 dependencies {
-    detektPlugins("io.gitlab.arturbosch.detekt:detekt-formatting:1.23.7") // Detekt formatting rules
     // --- Spring Boot Starters ---
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-validation")
@@ -58,17 +40,31 @@ dependencies {
     // --- Logging ---
     implementation("net.logstash.logback:logstash-logback-encoder:7.4") // For structured JSON logging
 
+    // --- Annotations (for @PostConstruct) - Jakarta EE for Spring Boot 3 ---
+    implementation("jakarta.annotation:jakarta.annotation-api")
+
+    // --- Crypto y Hash ---
+    implementation("com.google.guava:guava:32.1.3-jre")
+
     // --- Kotlin y Jackson ---
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
     implementation("org.jetbrains.kotlin:kotlin-reflect")
 
     // --- Base de Datos ---
     runtimeOnly("org.postgresql:postgresql")
+    runtimeOnly("com.h2database:h2")
+
+    // --- Messaging ---
+    implementation("org.springframework.boot:spring-boot-starter-amqp")
 
     // --- JWT ---
     implementation("io.jsonwebtoken:jjwt-api:0.11.5")
     runtimeOnly("io.jsonwebtoken:jjwt-impl:0.11.5")
     runtimeOnly("io.jsonwebtoken:jjwt-jackson:0.11.5")
+
+    // --- Shared Modules ---
+    implementation(project(":shared:messaging"))
+    implementation(project(":shared:common"))
 
     // --- Tests ---
     testImplementation("org.springframework.boot:spring-boot-starter-test") {

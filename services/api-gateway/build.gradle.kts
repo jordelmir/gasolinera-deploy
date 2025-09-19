@@ -1,4 +1,3 @@
-
 plugins {
     kotlin("jvm")
     kotlin("plugin.spring")
@@ -19,27 +18,19 @@ repositories {
     mavenCentral()
 }
 
+dependencyManagement {
+    imports {
+        mavenBom("org.springframework.cloud:spring-cloud-dependencies:2023.0.0")
+    }
+}
+
 dependencies {
-    // Spring Cloud Gateway
+    // Spring Cloud Gateway (includes webflux)
     implementation("org.springframework.cloud:spring-cloud-starter-gateway")
     implementation("org.springframework.cloud:spring-cloud-starter-loadbalancer")
 
-    // Security
-    implementation("org.springframework.boot:spring-boot-starter-security")
-    implementation("org.springframework.security:spring-security-oauth2-resource-server")
-    implementation("org.springframework.security:spring-security-oauth2-jose")
-
     // Monitoring
     implementation("org.springframework.boot:spring-boot-starter-actuator")
-    implementation("io.micrometer:micrometer-registry-prometheus")
-    implementation("io.micrometer:micrometer-tracing-bridge-brave")
-    implementation("io.opentelemetry:opentelemetry-exporter-otlp")
-
-    // Circuit Breaker
-    implementation("org.springframework.cloud:spring-cloud-starter-circuitbreaker-reactor-resilience4j")
-
-    // Validation
-    implementation("org.springframework.boot:spring-boot-starter-validation")
 
     // Kotlin
     implementation("org.jetbrains.kotlin:kotlin-reflect")
@@ -47,8 +38,6 @@ dependencies {
 
     // Testing
     testImplementation("org.springframework.boot:spring-boot-starter-test")
-    testImplementation("org.springframework.security:spring-security-test")
-    testImplementation("org.springframework.cloud:spring-cloud-contract-wiremock")
 }
 
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
@@ -60,4 +49,5 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
 
 tasks.getByName<org.springframework.boot.gradle.tasks.bundling.BootJar>("bootJar") {
     archiveFileName.set("app.jar")
+    mainClass.set("com.gasolinerajsm.apigateway.SimpleApiGatewayApplicationKt")
 }

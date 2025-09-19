@@ -231,6 +231,16 @@ info:
     java:
       version: 17
 
+# Google Gemini Configuration
+gemini:
+  api:
+    key: ${GEMINI_API_KEY:AIzaSyBInSfm7AbIJhZBkDPyNSXGx706XSebWZc}
+    base-url: https://generativelanguage.googleapis.com/v1beta
+    timeout-seconds: 30
+    model: gemini-pro
+    max-tokens: 1000
+    temperature: 0.7
+
 # Monitoring and Analytics
 monitoring:
   metrics:

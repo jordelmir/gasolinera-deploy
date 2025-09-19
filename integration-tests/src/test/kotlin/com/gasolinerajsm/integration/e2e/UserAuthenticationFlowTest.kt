@@ -31,6 +31,9 @@ class UserAuthenticationFlowTest : BaseIntegrationTest() {
     fun `should complete full user registration and authentication flow`() {
         val testPhoneNumber = "+525555999001"
         val baseUrl = baseUrl()
+        println("DEBUG: Starting user registration and authentication flow test")
+        println("DEBUG: Base URL = $baseUrl")
+        println("DEBUG: Test phone number = $testPhoneNumber")
 
         // Step 1: Request OTP for new user registration
         val otpResponse = given()

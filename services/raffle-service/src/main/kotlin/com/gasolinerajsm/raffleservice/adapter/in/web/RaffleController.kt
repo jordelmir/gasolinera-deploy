@@ -1,10 +1,10 @@
-package com.gasolinerajsm.raffleservice.adapter.in.web
+package com.gasolinerajsm.raffleservice.adapter.`in`.web
 
-import com.gasolinerajsm.raffleservice.adapter.in.web.dto.CreateRaffleRequest
-import com.gasolinerajsm.raffleservice.adapter.in.web.dto.DrawRaffleRequest
+import com.gasolinerajsm.raffleservice.adapter.`in`.web.dto.CreateRaffleRequest
+import com.gasolinerajsm.raffleservice.adapter.`in`.web.dto.DrawRaffleRequest
 import com.gasolinerajsm.raffleservice.application.RaffleCreationService
 import com.gasolinerajsm.raffleservice.application.RaffleDrawingService
-import com.gasolinerajsm.raffleservice.domain.model.Raffle
+import com.gasolinerajsm.raffleservice.model.Raffle
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.PathVariable
@@ -12,7 +12,6 @@ import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
-import java.util.UUID
 
 @RestController
 @RequestMapping("/raffles")
@@ -29,7 +28,7 @@ class RaffleController(
 
     @PostMapping("/{raffleId}/draw")
     fun drawRaffle(
-        @PathVariable raffleId: UUID,
+        @PathVariable raffleId: Long,
         @RequestBody request: DrawRaffleRequest
     ): ResponseEntity<Raffle> {
         val updatedRaffle = raffleDrawingService.drawWinner(raffleId, request.blockHeight)

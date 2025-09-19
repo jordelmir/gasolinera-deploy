@@ -1,8 +1,8 @@
 package com.gasolinerajsm.adengine.repository
 
 import com.gasolinerajsm.adengine.model.AdEngagement
-import com.gasolinerajsm.adengine.model.EngagementStatus
-import com.gasolinerajsm.adengine.model.EngagementType
+import com.gasolinerajsm.adengine.domain.model.EngagementStatus
+import com.gasolinerajsm.adengine.domain.model.EngagementType
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import org.springframework.data.jpa.repository.JpaRepository

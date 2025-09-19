@@ -1,5 +1,7 @@
 package com.gasolinerajsm.adengine.model
 
+import com.gasolinerajsm.adengine.domain.model.EngagementStatus
+import com.gasolinerajsm.adengine.domain.model.EngagementType
 import jakarta.persistence.*
 import jakarta.validation.constraints.*
 import org.hibernate.annotations.CreationTimestamp
@@ -393,66 +395,5 @@ data class AdEngagement(
 
     override fun toString(): String {
         return "AdEngagement(id=$id, userId=$userId, adId=${advertisement.id}, type=$engagementType, status=$status, completed=${isCompleted()})"
-    }
-}
-
-/**
- * Engagement type enumeration
- */
-enum class EngagementType(val displayName: String, val description: String) {
-    IMPRESSION("Impression", "Advertisement was displayed to user"),
-    VIEW("View", "User actively viewed the advertisement"),
-    CLICK("Click", "User clicked on the advertisement"),
-    INTERACTION("Interaction", "User interacted with the advertisement"),
-    COMPLETION("Completion", "User completed viewing the advertisement");
-
-    /**
-     * Check if engagement type is billable
-     */
-    fun isBillable(): Boolean {
-        return this == IMPRESSION || this == CLICK || this == COMPLETION
-    }
-
-    /**
-     * Check if engagement type indicates user interest
-     */
-    fun indicatesInterest(): Boolean {
-        return this == CLICK || this == INTERACTION || this == COMPLETION
-    }
-}
-
-/**
- * Engagement status enumeration
- */
-enum class EngagementStatus(val displayName: String, val description: String) {
-    STARTED("Started", "Engagement has started"),
-    VIEWED("Viewed", "Advertisement was viewed"),
-    INTERACTED("Interacted", "User interacted with advertisement"),
-    COMPLETED("Completed", "Engagement was completed successfully"),
-    SKIPPED("Skipped", "User skipped the advertisement"),
-    ABANDONED("Abandoned", "User abandoned the engagement"),
-    ERROR("Error", "An error occurred during engagement"),
-    TIMEOUT("Timeout", "Engagement timed out");
-
-    /**
-     * Check if status indicates successful engagement
-     */
-    fun isSuccessful(): Boolean {
-        return this == COMPLETED || this == VIEWED || this == INTERACTED
-    }
-
-    /**
-     * Check if status is a final state
-     */
-    fun isFinalState(): Boolean {
-        return this == COMPLETED || this == SKIPPED || this == ABANDONED ||
-               this == ERROR || this == TIMEOUT
-    }
-
-    /**
-     * Check if status allows further interaction
-     */
-    fun allowsInteraction(): Boolean {
-        return this == STARTED || this == VIEWED || this == INTERACTED
     }
 }

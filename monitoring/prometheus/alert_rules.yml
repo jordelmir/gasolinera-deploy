@@ -1,0 +1,220 @@
+# Reglas de alertas para Gasolinera JSM
+groups:
+  - name: gasolinera.infrastructure
+    rules:
+      # Alertas de disponibilidad de servicios
+      - alert: ServiceDown
+        expr: up == 0
+        for: 1m
+        labels:
+          severity: critical
+          category: infrastructure
+        annotations:
+          summary: "Servicio {{ $labels.job }} está caído"
+          description: "El servicio {{ $labels.job }} en {{ $labels.instance }} ha estado caído por más de 1 minuto."
+
+      # Alertas de memoria
+      - alert: HighMemoryUsage
+        expr: (gasolinera_jvm_memory_heap_used / gasolinera_jvm_memory_heap_max) * 100 > 85
+        for: 5m
+        labels:
+          severity: warning
+          category: performance
+        annotations:
+          summary: "Alto uso de memoria en {{ $labels.job }}"
+          description: "El servicio {{ $labels.job }} está usando {{ $value }}% de memoria heap."
+
+      - alert: CriticalMemoryUsage
+        expr: (gasolinera_jvm_memory_heap_used / gasolinera_jvm_memory_heap_max) * 100 > 95
+        for: 2m
+        labels:
+          severity: critical
+          category: performance
+        annotations:
+          summary: "Uso crítico de memoria en {{ $labels.job }}"
+          description: "El servicio {{ $labels.job }} está usando {{ $value }}% de memoria heap. Riesgo de OutOfMemoryError."
+
+      # Alertas de CPU
+      - alert: HighCPUUsage
+        expr: gasolinera_system_cpu_usage > 80
+        for: 10m
+        labels:
+          severity: warning
+          category: performance
+        annotations:
+          summary: "Alto uso de CPU en {{ $labels.job }}"
+          description: "El servicio {{ $labels.job }} está usando {{ $value }}% de CPU por más de 10 minutos."
+
+      # Alertas de base de datos
+      - alert: DatabaseConnectionPoolExhausted
+        expr: gasolinera_database_active_connections / gasolinera_database_max_connections > 0.9
+        for: 2m
+        labels:
+          severity: critical
+          category: database
+        annotations:
+          summary: "Pool de conexiones de BD casi agotado"
+          description: "El pool {{ $labels.pool }} está usando {{ $value | humanizePercentage }} de las conexiones disponibles."
+
+      - alert: DatabaseConnectionsHigh
+        expr: gasolinera_database_active_connections / gasolinera_database_max_connections > 0.7
+        for: 5m
+        labels:
+          severity: warning
+          category: database
+        annotations:
+          summary: "Alto número de conexiones de BD"
+          description: "El pool {{ $labels.pool }} está usando {{ $value | humanizePercentage }} de las conexiones disponibles."
+
+  - name: gasolinera.api
+    rules:
+      # Alertas de tasa de error
+      - alert: HighErrorRate
+        expr: |
+          (
+            sum(rate(gasolinera_api_requests_total{status_class=~"4xx|5xx"}[5m])) /
+            sum(rate(gasolinera_api_requests_total[5m]))
+          ) * 100 > 5
+        for: 5m
+        labels:
+          severity: warning
+          category: api
+        annotations:
+          summary: "Alta tasa de errores en API"
+          description: "La tasa de errores es {{ $value }}% en los últimos 5 minutos."
+
+      - alert: CriticalErrorRate
+        expr: |
+          (
+            sum(rate(gasolinera_api_requests_total{status_class=~"4xx|5xx"}[5m])) /
+            sum(rate(gasolinera_api_requests_total[5m]))
+          ) * 100 > 15
+        for: 2m
+        labels:
+          severity: critical
+          category: api
+        annotations:
+          summary: "Tasa crítica de errores en API"
+          description: "La tasa de errores es {{ $value }}% en los últimos 5 minutos."
+
+      # Alertas de latencia
+      - alert: HighResponseTime
+        expr: histogram_quantile(0.95, rate(gasolinera_api_request_duration_bucket[5m])) > 2000
+        for: 5m
+        labels:
+          severity: warning
+          category: performance
+        annotations:
+          summary: "Alto tiempo de respuesta en API"
+          description: "El percentil 95 del tiempo de respuesta es {{ $value }}ms."
+
+      - alert: CriticalResponseTime
+        expr: histogram_quantile(0.95, rate(gasolinera_api_request_duration_bucket[5m])) > 5000
+        for: 2m
+        labels:
+          severity: critical
+          category: performance
+        annotations:
+          summary: "Tiempo de respuesta crítico en API"
+          description: "El percentil 95 del tiempo de respuesta es {{ $value }}ms."
+
+      # Alertas de rate limiting
+      - alert: HighRateLimitHits
+        expr: rate(gasolinera_api_rate_limit_hits_total[5m]) > 10
+        for: 5m
+        labels:
+          severity: warning
+          category: security
+        annotations:
+          summary: "Alto número de hits de rate limiting"
+          description: "Se están produciendo {{ $value }} hits de rate limiting por segundo."
+
+  - name: gasolinera.authentication
+    rules:
+      # Alertas de autenticación
+      - alert: HighFailedLogins
+        expr: rate(gasolinera_auth_login_total{success="false"}[5m]) > 5
+        for: 2m
+        labels:
+          severity: warning
+          category: security
+        annotations:
+          summary: "Alto número de logins fallidos"
+          description: "Se están produciendo {{ $value }} logins fallidos por segundo."
+
+      - alert: AuthenticationServiceDown
+        expr: up{job="auth-service"} == 0
+        for: 30s
+        labels:
+          severity: critical
+          category: security
+        annotations:
+          summary: "Servicio de autenticación caído"
+          description: "El servicio de autenticación está inaccesible."
+
+      # Alertas de validación de tokens
+      - alert: HighInvalidTokens
+        expr: rate(gasolinera_auth_token_validation_total{valid="false"}[5m]) > 10
+        for: 5m
+        labels:
+          severity: warning
+          category: security
+        annotations:
+          summary: "Alto número de tokens inválidos"
+          description: "Se están validando {{ $value }} tokens inválidos por segundo."
+
+  - name: gasolinera.external
+    rules:
+      # Alertas de servicios externos
+      - alert: PostgreSQLDown
+        expr: up{job="postgresql"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          category: database
+        annotations:
+          summary: "PostgreSQL está caído"
+          description: "La base de datos PostgreSQL no está respondiendo."
+
+      - alert: RedisDown
+        expr: up{job="redis"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          category: cache
+        annotations:
+          summary: "Redis está caído"
+          description: "El servidor Redis no está respondiendo."
+
+      - alert: RabbitMQDown
+        expr: up{job="rabbitmq"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          category: messaging
+        annotations:
+          summary: "RabbitMQ está caído"
+          description: "El servidor RabbitMQ no está respondiendo."
+
+  - name: gasolinera.disk
+    rules:
+      # Alertas de espacio en disco
+      - alert: DiskSpaceWarning
+        expr: (node_filesystem_avail_bytes / node_filesystem_size_bytes) * 100 < 20
+        for: 5m
+        labels:
+          severity: warning
+          category: infrastructure
+        annotations:
+          summary: "Poco espacio en disco"
+          description: "El sistema de archivos {{ $labels.mountpoint }} tiene menos del 20% de espacio libre."
+
+      - alert: DiskSpaceCritical
+        expr: (node_filesystem_avail_bytes / node_filesystem_size_bytes) * 100 < 10
+        for: 2m
+        labels:
+          severity: critical
+          category: infrastructure
+        annotations:
+          summary: "Espacio en disco crítico"
+          description: "El sistema de archivos {{ $labels.mountpoint }} tiene menos del 10% de espacio libre."

@@ -99,7 +99,7 @@ data class Advertisement(
             return ValidationResult.failure("User does not match targeting criteria")
         }
 
-        if (statistics.hasReachedDailyLimit()) {
+        if (statistics.hasReachedDailyLimit(10000)) { // Default daily limit of 10,000 impressions
             return ValidationResult.failure("Daily impression limit reached")
         }
 
@@ -329,7 +329,7 @@ data class Advertisement(
         }
 
         // Validate content
-        val contentValidation = content.validate(adType)
+        val contentValidation = content.validateForAdType(adType)
         if (!contentValidation.isSuccess) {
             errors.add(contentValidation.message)
         }
